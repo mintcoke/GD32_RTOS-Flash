@@ -131,6 +131,13 @@ extern uint8_t g_RfidEpcLen[RFID_ANT_COUNT];
 extern uint8_t g_RfidNew   [RFID_ANT_COUNT];
 extern uint8_t g_RfidEpc   [RFID_ANT_COUNT][RFID_EPC_BYTES];
 
+/* ------ Software Watchdog ------ */
+#define RFID_WD_TIMEOUT_MS     2000U   /* Trigger soft reset after 2s no response */
+
+extern volatile uint32_t g_RfidLastAliveMs;  /* Last successful RFID communication timestamp */
+extern volatile uint8_t  g_RfidWdTriggered;  /* Watchdog soft-reset triggered flag */
+void RFID_WatchdogCheck(void);              /* Check RFID module liveness, soft-reset if needed */
+
 /* Debug helpers */
 extern volatile uint8_t  rfid_rx_buf[RFID_RX_BUF_SIZE];
 extern volatile uint16_t rfid_rx_len;

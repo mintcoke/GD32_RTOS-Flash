@@ -6,6 +6,7 @@
  * HIGH = module enabled, LOW = standby. It is not an RS485 direction pin.
  */
 #include "rfid_ecat.h"
+#include "ecat_api.h"
 #include "systick.h"
 #include <string.h>
 
@@ -18,6 +19,9 @@ volatile uint16_t rfid_rx_len = 0;
 volatile int16_t  rfid_last_result = RFID_RET_TIMEOUT;
 volatile uint8_t  rfid_last_cmd = 0;
 volatile uint8_t  rfid_last_error = 0;
+
+volatile uint32_t g_RfidLastAliveMs = 0;
+volatile uint8_t  g_RfidWdTriggered = 0;
 
 #define RFID_DMA                DMA0
 #define RFID_DMA_CLK            RCU_DMA0
@@ -322,6 +326,9 @@ void RFID_Init(void)
     usart_enable(RFID_USART);
 
     rfid_rx_dma_start();
+
+    extern volatile uint32_t g_SysTickCnt;
+    g_RfidLastAliveMs = g_SysTickCnt;
 }
 
 void RFID_SetAntenna(uint8_t ant)
@@ -398,6 +405,7 @@ int RFID_Inventory(rfid_tag_t *tag)
     tag->epc_len = (uint8_t)epc_bytes;
     memcpy(tag->epc, (const uint8_t *)rfid_rx_buf + 8, (uint32_t)epc_bytes);
     rfid_last_result = RFID_RET_OK;
+    g_RfidLastAliveMs = g_SysTickCnt;
     return RFID_RET_OK;
 }
 
@@ -447,6 +455,7 @@ int RFID_ParseTag(rfid_tag_t *tag)
     tag->epc_len = (uint8_t)epc_bytes;
     memcpy(tag->epc, (const uint8_t *)rfid_rx_buf + 8, (uint32_t)epc_bytes);
     rfid_last_result = RFID_RET_OK;
+    g_RfidLastAliveMs = g_SysTickCnt;
     return RFID_RET_OK;
 }
 
@@ -507,6 +516,7 @@ int RFID_ReadTag(uint8_t bank, uint16_t addr, uint16_t len_words, uint8_t *data)
 
     memcpy(data, (const uint8_t *)rfid_rx_buf + rsp_data_offset, rsp_data_bytes);
     rfid_last_result = RFID_RET_OK;
+    g_RfidLastAliveMs = g_SysTickCnt;
     return RFID_RET_OK;
 }
 
@@ -568,6 +578,7 @@ int RFID_WriteTag(uint8_t bank, uint16_t addr, uint16_t len_words, const uint8_t
     }
 
     rfid_last_result = RFID_RET_OK;
+    g_RfidLastAliveMs = g_SysTickCnt;
     return RFID_RET_OK;
 }
 
@@ -624,12 +635,51 @@ int RFID_Command(uint8_t cmd_id,
     }
 
     rfid_last_result = RFID_RET_OK;
+    g_RfidLastAliveMs = g_SysTickCnt;
     return RFID_RET_OK;
 }
 
 void RFID_UART_IRQHandler(void)
 {
     rfid_clear_usart_errors();
+}
+
+void RFID_WatchdogCheck(void)
+{
+    extern volatile uint32_t g_SysTickCnt;
+    extern void ECAT_Stack_MainLoop(void);
+
+    if (g_RfidWdTriggered != 0U) {
+        return;  /* Already triggered, waiting for hardware WD to recover or MCU reset */
+    }
+
+    if ((uint32_t)(g_SysTickCnt - g_RfidLastAliveMs) <= RFID_WD_TIMEOUT_MS) {
+        return;  /* RFID module is alive */
+    }
+
+    /* RFID module not responding for > 2s — trigger soft reset */
+    g_RfidWdTriggered = 1U;
+
+    /* Notify PLC via PDO */
+    DI(TX_RFID_CMD_STATUS) = RFID_PLC_STATUS_ERROR;
+    DI(TX_RFID_CMD_RESULT) = RFID_ERR_WD_TIMEOUT;
+
+    /* Soft reset RFID module */
+    RFID_Reset();
+
+    /* Wait 100ms for module reboot, keep EtherCAT alive */
+    {
+        uint32_t deadline = g_SysTickCnt + 100U;
+        while ((int32_t)(g_SysTickCnt - deadline) < 0) {
+            ECAT_Stack_MainLoop();
+        }
+    }
+
+    /* Reinitialize USART + DMA */
+    rfid_rx_dma_start();
+
+    /* Reset watchdog timer (starts 2s cooldown) */
+    g_RfidLastAliveMs = g_SysTickCnt;
 }
 
 #define RFID_SCAN_MS 30U
