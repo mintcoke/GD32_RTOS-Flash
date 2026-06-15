@@ -100,6 +100,8 @@ extern "C" {
 #define RFID_PLC_STATUS_OK      2
 #define RFID_PLC_STATUS_ERROR   3
 
+#define RFID_ERR_WD_TIMEOUT    0xE001U
+
 typedef struct {
     float    sonar_zero_offset;
     float    sonar_scale_factor;

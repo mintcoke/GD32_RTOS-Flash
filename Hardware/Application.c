@@ -574,6 +574,8 @@ void DO_LED_Ctrl(void)
     for (uint8_t ant = 0; ant < RFID_ANT_COUNT; ant++) {
         RFID_MapAntennaToPdo(ant, rfid_pdo_base[ant]);
     }
+
+    RFID_WatchdogCheck();
 }
 
 void DO_LED_Off(void)

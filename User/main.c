@@ -14,6 +14,7 @@
 #include "ecat_api.h"
 #include "uart.h"
 #include "rfid_ecat.h"
+#include "wdg_ecat.h"
 
 /*───────────────────────────────────────────────────────────
  * ECAT Monitor — only prints AL state changes
@@ -49,6 +50,8 @@ int main(void)
 
     RFID_Init();
 
+    WDG_Init();
+
     while (1) {
         ECAT_Stack_MainLoop();
         if ((ECAT_GetAlState() & 0x0FU) == 0x08U) {
@@ -57,6 +60,7 @@ int main(void)
             }
         }
         ECAT_Monitor();
+        WDG_Feed();
     }
 }
 
