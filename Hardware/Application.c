@@ -1,0 +1,581 @@
+/*
+ * Application.c — PDO mapping (placeholder, no sensors/outputs on this board)
+ */
+
+#define _Application_ 1
+#include <string.h>
+#include "ecat_api.h"
+#include "Application.h"
+#include "rfid_ecat.h"
+#undef _Application_
+
+#include "SSC-Device.h"
+#include "GD32Evb.h"
+
+#define RFID_PDO_RSSI        0
+#define RFID_PDO_EPC_LEN     1
+#define RFID_PDO_NEW         2
+#define RFID_PDO_EPC         3
+#define RFID_ANT_SETTLE_MS   5U
+#define RFID_CMD_DATA_WORDS  32
+#define RFID_REQ_DATA_WORDS  30
+#define RFID_CMD_DATA_BYTES  (RFID_CMD_DATA_WORDS * 2)
+#define RFID_REQ_DATA_BYTES  (RFID_REQ_DATA_WORDS * 2)
+#define RFID_EPC_PC_ADDR     1U
+#define RFID_EPC_DATA_ADDR   2U
+#define RFID_RAW_TIMEOUT_MS  500U
+#define RFID_EPC_SELECT_PTR  0x00000020UL
+#define RFID_SELECT_MODE_OFF 0x01U
+
+static uint16_t RFID_PackBytes(const uint8_t *data, uint16_t len, uint16_t byte_idx)
+{
+    uint16_t w = 0;
+
+    if (byte_idx < len) {
+        w = (uint16_t)data[byte_idx] << 8;
+        if ((uint16_t)(byte_idx + 1U) < len) {
+            w |= data[byte_idx + 1U];
+        }
+    }
+    return w;
+}
+
+static uint16_t RFID_ReadU16BE(const uint8_t *data)
+{
+    return ((uint16_t)data[0] << 8) | data[1];
+}
+
+static void RFID_WriteU16BE(uint8_t *data, uint16_t value)
+{
+    data[0] = (uint8_t)(value >> 8);
+    data[1] = (uint8_t)value;
+}
+
+static void RFID_WriteU32BE(uint8_t *data, uint32_t value)
+{
+    data[0] = (uint8_t)(value >> 24);
+    data[1] = (uint8_t)(value >> 16);
+    data[2] = (uint8_t)(value >> 8);
+    data[3] = (uint8_t)value;
+}
+
+static void RFID_UnpackPdoBytes(uint16_t pdo_base, uint16_t byte_len, uint8_t *data)
+{
+    uint16_t out = 0;
+
+    for (uint16_t i = 0; i < RFID_REQ_DATA_WORDS && out < byte_len; i++) {
+        uint16_t w = DO(pdo_base + i);
+        data[out++] = (uint8_t)(w >> 8);
+        if (out < byte_len) {
+            data[out++] = (uint8_t)w;
+        }
+    }
+}
+
+static void RFID_WriteCmdDataToPdo(const uint8_t *data, uint16_t byte_len)
+{
+    if (byte_len > RFID_CMD_DATA_BYTES) {
+        byte_len = RFID_CMD_DATA_BYTES;
+    }
+
+    DI(TX_RFID_CMD_DATA_LEN) = byte_len;
+    for (uint16_t i = 0; i < RFID_CMD_DATA_WORDS; i++) {
+        DI(TX_RFID_CMD_DATA + i) = RFID_PackBytes(data, byte_len, (uint16_t)(i * 2U));
+    }
+}
+
+static void RFID_ClearCmdDataPdo(void)
+{
+    DI(TX_RFID_CMD_DATA_LEN) = 0;
+    for (uint16_t i = 0; i < RFID_CMD_DATA_WORDS; i++) {
+        DI(TX_RFID_CMD_DATA + i) = 0;
+    }
+}
+
+static int RFID_PlcCommand(uint8_t cmd_id,
+                           const uint8_t *tx_data,
+                           uint16_t tx_len,
+                           uint8_t *rx_data,
+                           uint16_t *rx_len)
+{
+    int ret = RFID_Command(cmd_id, tx_data, tx_len, rx_data, rx_len, RFID_RAW_TIMEOUT_MS);
+
+    if (ret == RFID_RET_OK) {
+        RFID_WriteCmdDataToPdo(rx_data, *rx_len);
+    }
+    return ret;
+}
+
+static int RFID_PlcCommandNoParam(uint8_t cmd_id, uint8_t *buf)
+{
+    uint16_t rsp_len = RFID_CMD_DATA_BYTES;
+
+    return RFID_PlcCommand(cmd_id, NULL, 0U, buf, &rsp_len);
+}
+
+static int RFID_PlcCommandU8(uint8_t cmd_id, uint8_t value, uint8_t *buf)
+{
+    uint16_t rsp_len = RFID_CMD_DATA_BYTES;
+
+    buf[0] = value;
+    return RFID_PlcCommand(cmd_id, buf, 1U, buf, &rsp_len);
+}
+
+static int RFID_PlcCommandStatusOnly(uint8_t cmd_id, const uint8_t *tx_data, uint16_t tx_len, uint8_t *buf)
+{
+    uint16_t rsp_len = RFID_CMD_DATA_BYTES;
+    int ret;
+
+    ret = RFID_Command(cmd_id, tx_data, tx_len, buf, &rsp_len, RFID_RAW_TIMEOUT_MS);
+    if (ret == RFID_RET_OK) {
+        RFID_WriteCmdDataToPdo(buf, rsp_len);
+        if (rsp_len < 1U) {
+            rfid_last_result = RFID_RET_FRAME_ERR;
+            return RFID_RET_FRAME_ERR;
+        }
+        if (buf[0] != 0U) {
+            rfid_last_error = buf[0];
+            rfid_last_result = RFID_RET_MODULE_ERR;
+            return RFID_RET_MODULE_ERR;
+        }
+    }
+    return ret;
+}
+
+static int RFID_PlcCommandStatusU8(uint8_t cmd_id, uint8_t value, uint8_t *buf)
+{
+    buf[0] = value;
+    return RFID_PlcCommandStatusOnly(cmd_id, buf, 1U, buf);
+}
+
+static int RFID_PlcCommandStatusU16(uint8_t cmd_id, uint16_t value, uint8_t *buf)
+{
+    RFID_WriteU16BE(buf, value);
+    return RFID_PlcCommandStatusOnly(cmd_id, buf, 2U, buf);
+}
+
+static uint16_t RFID_PlcPowerParam(uint16_t value)
+{
+    if (value <= 33U) {
+        return (uint16_t)(value * 100U);
+    }
+    return value;
+}
+
+static int RFID_PlcSelectEpcBytes(const uint8_t *epc, uint16_t byte_len, uint8_t *buf)
+{
+    if (epc == NULL || byte_len == 0U || byte_len > 31U) {
+        rfid_last_result = RFID_RET_FRAME_ERR;
+        return RFID_RET_FRAME_ERR;
+    }
+
+    buf[0] = 0x01U; /* Target=0, Action=0, MemBank=EPC. */
+    RFID_WriteU32BE(&buf[1], RFID_EPC_SELECT_PTR);
+    buf[5] = (uint8_t)(byte_len * 8U);
+    buf[6] = 0x00U;
+    memcpy(&buf[7], epc, byte_len);
+    return RFID_PlcCommandStatusOnly(RFID_CMD_SET_SELECT,
+                                     buf,
+                                     (uint16_t)(7U + byte_len),
+                                     buf);
+}
+
+static int RFID_PlcSelectEpcFromPdo(uint16_t byte_len, uint8_t *buf)
+{
+    uint8_t epc[RFID_REQ_DATA_BYTES];
+
+    RFID_UnpackPdoBytes(RX_RFID_DATA, byte_len, epc);
+    return RFID_PlcSelectEpcBytes(epc, byte_len, buf);
+}
+
+static uint16_t RFID_PlcEpcActualAddr(uint16_t addr)
+{
+    if (addr < RFID_EPC_DATA_ADDR) {
+        return (uint16_t)(RFID_EPC_DATA_ADDR + addr);
+    }
+    return addr;
+}
+
+static void RFID_UpdateEpcCacheFromWrite(uint8_t ant,
+                                         uint16_t actual_addr,
+                                         const uint8_t *data,
+                                         uint16_t byte_len)
+{
+    uint16_t offset;
+    uint16_t copy_len;
+    uint8_t idx;
+
+    if (ant < 1U || ant > RFID_ANT_COUNT ||
+        actual_addr < RFID_EPC_DATA_ADDR ||
+        data == 0 || byte_len == 0U) {
+        return;
+    }
+
+    offset = (uint16_t)((actual_addr - RFID_EPC_DATA_ADDR) * 2U);
+    if (offset >= RFID_EPC_BYTES) {
+        return;
+    }
+
+    copy_len = byte_len;
+    if ((uint16_t)(offset + copy_len) > RFID_EPC_BYTES) {
+        copy_len = (uint16_t)(RFID_EPC_BYTES - offset);
+    }
+
+    idx = (uint8_t)(ant - 1U);
+    memcpy(&g_RfidEpc[idx][offset], data, copy_len);
+    if (g_RfidEpcLen[idx] < (uint8_t)(offset + copy_len)) {
+        g_RfidEpcLen[idx] = (uint8_t)(offset + copy_len);
+    }
+    g_RfidNew[idx] = 1U;
+}
+
+static int RFID_PlcEnsureSelected(uint8_t ant, uint8_t *buf)
+{
+    rfid_tag_t tag;
+    uint8_t idx;
+    int ret;
+
+    if (ant < 1U || ant > RFID_ANT_COUNT) {
+        return RFID_RET_OK;
+    }
+
+    idx = (uint8_t)(ant - 1U);
+    if (g_RfidEpcLen[idx] == 0U) {
+        ret = RFID_Inventory(&tag);
+        if (ret != RFID_RET_OK) {
+            return ret;
+        }
+
+        g_RfidRssi[idx] = tag.rssi;
+        g_RfidEpcLen[idx] = tag.epc_len;
+        memset(g_RfidEpc[idx], 0, RFID_EPC_BYTES);
+        memcpy(g_RfidEpc[idx], tag.epc, tag.epc_len);
+        g_RfidNew[idx] = 1U;
+    }
+
+    return RFID_PlcSelectEpcBytes(g_RfidEpc[idx], g_RfidEpcLen[idx], buf);
+}
+
+static void RFID_EcatDelayMs(uint32_t ms)
+{
+    extern volatile uint32_t g_SysTickCnt;
+    uint32_t deadline = g_SysTickCnt + ms;
+
+    while ((int32_t)(g_SysTickCnt - deadline) < 0) {
+        ECAT_Stack_MainLoop();
+    }
+}
+
+static void RFID_MapAntennaToPdo(uint8_t ant_idx, uint16_t pdo_base)
+{
+    extern uint8_t  g_RfidRssi[RFID_ANT_COUNT];
+    extern uint8_t  g_RfidEpcLen[RFID_ANT_COUNT];
+    extern uint8_t  g_RfidNew[RFID_ANT_COUNT];
+    extern uint8_t  g_RfidEpc[RFID_ANT_COUNT][RFID_EPC_BYTES];
+
+    DI(pdo_base + RFID_PDO_RSSI) = g_RfidRssi[ant_idx];
+    DI(pdo_base + RFID_PDO_EPC_LEN) = g_RfidEpcLen[ant_idx];
+    DI(pdo_base + RFID_PDO_NEW) = g_RfidNew[ant_idx];
+
+    for (int i = 0; i < 31; i++) {
+        uint16_t byte_idx = (uint16_t)(i * 2);
+        DI(pdo_base + RFID_PDO_EPC + i) =
+            RFID_PackBytes(g_RfidEpc[ant_idx], g_RfidEpcLen[ant_idx], byte_idx);
+    }
+}
+
+uint8_t RFID_EcatCmdTask(void)
+{
+    static uint8_t s_Armed = 1U;
+    uint8_t buf[RFID_CMD_DATA_BYTES];
+    uint16_t cmd = DO(RX_RFID_CMD);
+    uint16_t ant = DO(RX_RFID_ANT);
+    uint16_t addr = DO(RX_RFID_ADDR);
+    uint16_t words = DO(RX_RFID_WORDS);
+    int ret = RFID_RET_FRAME_ERR;
+
+    if (cmd == RFID_PLC_CMD_NONE) {
+        if (DI(TX_RFID_CMD_STATUS) != RFID_PLC_STATUS_BUSY) {
+            DI(TX_RFID_CMD_STATUS) = RFID_PLC_STATUS_IDLE;
+        }
+        s_Armed = 1U;
+        return 0U;
+    }
+    if (s_Armed == 0U) {
+        return 0U;
+    }
+    s_Armed = 0U;
+
+    DI(TX_RFID_CMD_ECHO) = cmd;
+    DI(TX_RFID_CMD_STATUS) = RFID_PLC_STATUS_BUSY;
+    DI(TX_RFID_CMD_RESULT) = 0;
+    RFID_ClearCmdDataPdo();
+
+    if (ant >= 1U && ant <= RFID_ANT_COUNT) {
+        RFID_SetAntenna((uint8_t)ant);
+        RFID_EcatDelayMs(RFID_ANT_SETTLE_MS);
+    }
+
+    switch (cmd) {
+    case RFID_PLC_CMD_GET_INFO:
+        if (addr > 1U) {
+            addr = 1U;
+        }
+        ret = RFID_PlcCommandU8(RFID_CMD_READ_INFO, (uint8_t)addr, buf);
+        break;
+
+    case RFID_PLC_CMD_READ_TID:
+        if (words == 0U) {
+            words = 6U;
+        }
+        if (words > (uint16_t)(RFID_CMD_DATA_BYTES / 2U)) {
+            words = (uint16_t)(RFID_CMD_DATA_BYTES / 2U);
+        }
+        ret = RFID_ReadTag(RFID_BANK_TID, addr, words, buf);
+        if (ret == RFID_RET_OK) {
+            RFID_WriteCmdDataToPdo(buf, (uint16_t)(words * 2U));
+        }
+        break;
+
+    case RFID_PLC_CMD_READ_USER:
+        if (words == 0U) {
+            words = 6U;
+        }
+        if (words > (uint16_t)(RFID_CMD_DATA_BYTES / 2U)) {
+            words = (uint16_t)(RFID_CMD_DATA_BYTES / 2U);
+        }
+        ret = RFID_ReadTag(RFID_BANK_USER, addr, words, buf);
+        if (ret == RFID_RET_OK) {
+            RFID_WriteCmdDataToPdo(buf, (uint16_t)(words * 2U));
+        }
+        break;
+
+    case RFID_PLC_CMD_WRITE_USER:
+        if (words == 0U || words > (uint16_t)(RFID_REQ_DATA_BYTES / 2U)) {
+            ret = RFID_RET_FRAME_ERR;
+        } else {
+            RFID_UnpackPdoBytes(RX_RFID_DATA, (uint16_t)(words * 2U), buf);
+            RFID_WriteCmdDataToPdo(buf, (uint16_t)(words * 2U));
+            ret = RFID_WriteTag(RFID_BANK_USER, addr, words, buf);
+        }
+        break;
+
+    case RFID_PLC_CMD_WRITE_EPC:
+        if (words == 0U || words > (uint16_t)(RFID_REQ_DATA_BYTES / 2U)) {
+            ret = RFID_RET_FRAME_ERR;
+        } else {
+            uint8_t write_buf[RFID_REQ_DATA_BYTES];
+            uint16_t actual_addr = RFID_PlcEpcActualAddr(addr);
+            uint16_t write_bytes = (uint16_t)(words * 2U);
+
+            ret = RFID_PlcEnsureSelected((uint8_t)ant, buf);
+            if (ret == RFID_RET_OK) {
+                RFID_UnpackPdoBytes(RX_RFID_DATA, write_bytes, write_buf);
+                RFID_WriteCmdDataToPdo(write_buf, write_bytes);
+                ret = RFID_WriteTag(RFID_BANK_EPC, actual_addr, words, write_buf);
+                if (ret == RFID_RET_OK) {
+                    RFID_UpdateEpcCacheFromWrite((uint8_t)ant, actual_addr, write_buf, write_bytes);
+                    if (ant >= 1U && ant <= RFID_ANT_COUNT && g_RfidEpcLen[ant - 1U] > 0U) {
+                        (void)RFID_PlcSelectEpcBytes(g_RfidEpc[ant - 1U], g_RfidEpcLen[ant - 1U], buf);
+                    }
+                    RFID_WriteCmdDataToPdo(write_buf, write_bytes);
+                    rfid_last_error = 0U;
+                    rfid_last_result = RFID_RET_OK;
+                }
+            }
+        }
+        break;
+
+    case RFID_PLC_CMD_SET_EPC_LEN:
+        if (words == 0U || words > (uint16_t)(RFID_EPC_BYTES / 2U)) {
+            ret = RFID_RET_FRAME_ERR;
+        } else {
+            ret = RFID_ReadTag(RFID_BANK_EPC, RFID_EPC_PC_ADDR, 1U, buf);
+            if (ret == RFID_RET_OK) {
+                uint16_t pc = RFID_ReadU16BE(buf);
+                pc = (uint16_t)((pc & 0x07FFU) | ((words & 0x1FU) << 11));
+                RFID_WriteU16BE(buf, pc);
+                RFID_WriteCmdDataToPdo(buf, 2U);
+                ret = RFID_WriteTag(RFID_BANK_EPC, RFID_EPC_PC_ADDR, 1U, buf);
+            }
+        }
+        break;
+
+    case RFID_PLC_CMD_SET_POWER:
+        ret = RFID_PlcCommandStatusU16(RFID_CMD_SET_POWER, RFID_PlcPowerParam(addr), buf);
+        break;
+
+    case RFID_PLC_CMD_GET_POWER:
+        ret = RFID_PlcCommandNoParam(RFID_CMD_GET_POWER, buf);
+        break;
+
+    case RFID_PLC_CMD_SET_REGION:
+        if (addr > 0xFFU) {
+            ret = RFID_RET_FRAME_ERR;
+        } else {
+            ret = RFID_PlcCommandStatusU8(RFID_CMD_SET_REGION, (uint8_t)addr, buf);
+        }
+        break;
+
+    case RFID_PLC_CMD_GET_REGION:
+        ret = RFID_PlcCommandNoParam(RFID_CMD_GET_REGION, buf);
+        break;
+
+    case RFID_PLC_CMD_SET_CHANNEL:
+        if (addr > 0xFFU) {
+            ret = RFID_RET_FRAME_ERR;
+        } else {
+            ret = RFID_PlcCommandStatusU8(RFID_CMD_SET_CHANNEL, (uint8_t)addr, buf);
+        }
+        break;
+
+    case RFID_PLC_CMD_GET_CHANNEL:
+        ret = RFID_PlcCommandNoParam(RFID_CMD_GET_CHANNEL, buf);
+        break;
+
+    case RFID_PLC_CMD_SET_HOP:
+        ret = RFID_PlcCommandStatusU8(RFID_CMD_SET_HOP, (addr == 0U) ? 0x00U : 0xFFU, buf);
+        break;
+
+    case RFID_PLC_CMD_GET_HOP:
+        ret = RFID_PlcCommandNoParam(RFID_CMD_GET_HOP, buf);
+        break;
+
+    case RFID_PLC_CMD_SET_MODE:
+        if (addr > 1U) {
+            ret = RFID_RET_FRAME_ERR;
+        } else {
+            ret = RFID_PlcCommandStatusU8(RFID_CMD_SET_MODE, (uint8_t)addr, buf);
+        }
+        break;
+
+    case RFID_PLC_CMD_GET_MODE:
+        ret = RFID_PlcCommandNoParam(RFID_CMD_GET_MODE, buf);
+        break;
+
+    case RFID_PLC_CMD_INVENTORY:
+        {
+            rfid_tag_t tag;
+            ret = RFID_Inventory(&tag);
+            if (ret == RFID_RET_OK) {
+                buf[0] = tag.rssi;
+                RFID_WriteU16BE(&buf[1], tag.pc);
+                buf[3] = tag.epc_len;
+                memcpy(&buf[4], tag.epc, tag.epc_len);
+                RFID_WriteCmdDataToPdo(buf, (uint16_t)(4U + tag.epc_len));
+            }
+        }
+        break;
+
+    case RFID_PLC_CMD_STOP_POLL:
+        ret = RFID_PlcCommandStatusOnly(RFID_CMD_STOP_POLL, NULL, 0U, buf);
+        break;
+
+    case RFID_PLC_CMD_SET_CH_LIST:
+        if (words > RFID_REQ_DATA_BYTES) {
+            ret = RFID_RET_FRAME_ERR;
+        } else {
+            buf[0] = (uint8_t)words;
+            RFID_UnpackPdoBytes(RX_RFID_DATA, words, &buf[1]);
+            ret = RFID_PlcCommandStatusOnly(RFID_CMD_SET_CH_LIST,
+                                            buf,
+                                            (uint16_t)(words + 1U),
+                                            buf);
+        }
+        break;
+
+    case RFID_PLC_CMD_GET_CH_LIST:
+        ret = RFID_PlcCommandNoParam(RFID_CMD_GET_CH_LIST, buf);
+        break;
+
+    case RFID_PLC_CMD_SET_RX:
+        RFID_UnpackPdoBytes(RX_RFID_DATA, 4U, buf);
+        ret = RFID_PlcCommandStatusOnly(RFID_CMD_SET_RX, buf, 4U, buf);
+        break;
+
+    case RFID_PLC_CMD_GET_RX:
+        ret = RFID_PlcCommandNoParam(RFID_CMD_GET_RX, buf);
+        break;
+
+    case RFID_PLC_CMD_TEST_RSSI:
+        ret = RFID_PlcCommandNoParam(RFID_CMD_TEST_RSSI, buf);
+        break;
+
+    case RFID_PLC_CMD_SET_CARRIER:
+        ret = RFID_PlcCommandStatusU8(RFID_CMD_SET_CARRIER, (addr == 0U) ? 0x00U : 0xFFU, buf);
+        break;
+
+    case RFID_PLC_CMD_RESET:
+        RFID_Reset();
+        ret = RFID_RET_OK;
+        break;
+
+    case RFID_PLC_CMD_SELECT_EPC:
+        if (words == 0U) {
+            words = (ant >= 1U && ant <= RFID_ANT_COUNT) ? g_RfidEpcLen[ant - 1U] : 0U;
+            if (words > 0U) {
+                ret = RFID_PlcSelectEpcBytes(g_RfidEpc[ant - 1U], words, buf);
+            } else {
+                ret = RFID_RET_FRAME_ERR;
+            }
+        } else {
+            ret = RFID_PlcSelectEpcFromPdo(words, buf);
+        }
+        break;
+
+    case RFID_PLC_CMD_CLEAR_SELECT:
+        ret = RFID_PlcCommandStatusU8(RFID_CMD_SET_SEL_MODE, RFID_SELECT_MODE_OFF, buf);
+        break;
+
+    case RFID_PLC_CMD_RAW:
+        if (addr > 0xFFU || words > RFID_REQ_DATA_BYTES) {
+            ret = RFID_RET_FRAME_ERR;
+        } else {
+            uint16_t rsp_len = RFID_CMD_DATA_BYTES;
+            RFID_UnpackPdoBytes(RX_RFID_DATA, words, buf);
+            ret = RFID_Command((uint8_t)addr,
+                               buf,
+                               words,
+                               buf,
+                               &rsp_len,
+                               RFID_RAW_TIMEOUT_MS);
+            RFID_WriteCmdDataToPdo(buf, rsp_len);
+        }
+        break;
+
+    default:
+        ret = RFID_RET_FRAME_ERR;
+        break;
+    }
+
+    if (ret == RFID_RET_OK) {
+        DI(TX_RFID_CMD_STATUS) = RFID_PLC_STATUS_OK;
+        DI(TX_RFID_CMD_RESULT) = 0;
+    } else {
+        DI(TX_RFID_CMD_STATUS) = RFID_PLC_STATUS_ERROR;
+        DI(TX_RFID_CMD_RESULT) = (uint16_t)((rfid_last_error != 0U) ? rfid_last_error : (uint16_t)(-ret));
+    }
+    return 1U;
+}
+
+void DO_LED_Ctrl(void)
+{
+    static uint16_t s_Counter = 0;
+    static const uint16_t rfid_pdo_base[RFID_ANT_COUNT] = {
+        TX_RFID1_RSSI,
+        TX_RFID2_RSSI,
+        TX_RFID3_RSSI
+    };
+
+    s_Counter++;
+    DI(0) = s_Counter;
+
+    /* ANT1: DI(1..34), ANT2: DI(35..68), ANT3: DI(69..102). */
+    for (uint8_t ant = 0; ant < RFID_ANT_COUNT; ant++) {
+        RFID_MapAntennaToPdo(ant, rfid_pdo_base[ant]);
+    }
+}
+
+void DO_LED_Off(void)
+{
+}

@@ -36,6 +36,7 @@ OF SUCH DAMAGE.
 #include "systick.h"
 
 volatile static uint32_t delay;
+volatile uint32_t g_SysTickCnt = 0;  /* Global tick counter for ECAT main loop */
 
 /*!
     \brief      configure systick

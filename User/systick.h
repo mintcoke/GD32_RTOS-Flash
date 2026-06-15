@@ -37,6 +37,9 @@ OF SUCH DAMAGE.
 
 #include <stdint.h>
 
+/* Global tick counter (incremented every 1ms by SysTick_Handler) */
+extern volatile uint32_t g_SysTickCnt;
+
 /* configure systick */
 void systick_config(void);
 /* delay a time in milliseconds */

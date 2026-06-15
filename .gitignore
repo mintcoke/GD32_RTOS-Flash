@@ -1,0 +1,28 @@
+# ── Keil / MDK-ARM build outputs ──
+MDK-ARM/Objects/*.o
+MDK-ARM/Objects/*.crf
+MDK-ARM/Objects/*.d
+MDK-ARM/Objects/*.axf
+MDK-ARM/Objects/*.hex
+MDK-ARM/Objects/*.htm
+MDK-ARM/Objects/*.lnp
+MDK-ARM/Objects/*.dep
+MDK-ARM/Objects/*.iex
+MDK-ARM/Objects/*.log
+MDK-ARM/Objects/*.sct
+MDK-ARM/Objects/*_Target*.dep
+MDK-ARM/Listings/*.map
+MDK-ARM/Listings/*.lst
+MDK-ARM/JLinkLog.txt
+MDK-ARM/.vscode/
+MDK-ARM/*.uvguix.*
+
+# ── VS Code ──
+.vscode/
+
+# ── Office temp files ──
+DOC/~$*
+
+# ── OS ──
+Thumbs.db
+Desktop.ini
