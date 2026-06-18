@@ -1,22 +1,25 @@
 # -*- coding: utf-8 -*-
 """生成 ECAT_Core.uvprojx（库工程）和 EtherCAT_RFID.uvprojx（应用工程）。
-从 git 干净版提取 TargetOption 和文件路径，纯字符串拼接，避免子树共享。
-用法：python _gen_proj.py --lib-files mailbox.c sdoserv.c --with-lib
-  --lib-files: 进库的 SSC 文件名（不含路径）
-  --with-lib:  应用工程是否引用 ECAT_Core.lib（阶段1起加此参数）
+从全源码基线 commit 0cf5a3b 提取 TargetOption 和文件路径，纯字符串拼接。
+通用版：--lib-files 可指定任意文件进库（SSC / 外设驱动 / system 等），
+脚本按文件原始所属 Group 自动归类。
+
+用法：
+  python _gen_proj.py --lib-files mailbox.c sdoserv.c --with-lib
+  python _gen_proj.py --lib-files mailbox.c ... gd32f10x_spi.c --with-lib
 """
 import re, subprocess, sys, os
+
+# 全源码基线 commit（含全部 37 文件，固定不变）
+BASELINE_COMMIT = '0cf5a3b'
 
 def main():
     import argparse
     ap = argparse.ArgumentParser()
-    ap.add_argument('--lib-files', nargs='*', default=[], help='进库的 SSC 文件名')
+    ap.add_argument('--lib-files', nargs='*', default=[], help='进库的文件名（不含路径）')
     ap.add_argument('--with-lib', action='store_true', help='应用工程引用 ECAT_Core.lib')
     args = ap.parse_args()
 
-    # 从全源码基线 commit 读取（固定 0cf5a3b，含全部 37 文件）
-    # 注意：不能用 HEAD，因为任务推进后 HEAD 的 uvprojx 已移除进库文件
-    BASELINE_COMMIT = '0cf5a3b'
     repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     clean = subprocess.check_output(
         ['git', 'show', f'{BASELINE_COMMIT}:MDK-ARM/EtherCAT_RFID.uvprojx'],
@@ -27,38 +30,37 @@ def main():
     before = clean[:clean.index('  <Targets>')]
     after = clean[clean.index('  </Targets>') + len('  </Targets>'):]
 
-    # 文件路径映射（从干净版提取所有文件）
-    all_files = {}
-    for m in re.finditer(
-        r'<FileName>([^<]+)</FileName>\s*<FileType>(\d+)</FileType>\s*<FilePath>([^<]+)</FilePath>',
-        clean):
-        all_files[m.group(1)] = (m.group(2), m.group(3))
+    # 从基线提取「文件 → (FileType, FilePath, 所属 Group)」映射，保持原始 Group 顺序
+    all_files = {}      # fn -> (filetype, filepath)
+    file_group = {}     # fn -> groupname
+    group_order = []    # Group 出现顺序
+    # 用正则按 Group 块解析
+    for gm in re.finditer(r'<GroupName>([^<]+)</GroupName>\s*<Files>(.*?)</Files>', clean, re.DOTALL):
+        gn = gm.group(1)
+        if gn not in group_order:
+            group_order.append(gn)
+        for fm in re.finditer(r'<FileName>([^<]+)</FileName>\s*<FileType>(\d+)</FileType>\s*<FilePath>([^<]+)</FilePath>', gm.group(2)):
+            fn = fm.group(1)
+            all_files[fn] = (fm.group(2), fm.group(3))
+            file_group[fn] = gn
 
-    # 全部 9 个 SSC 文件
-    ALL_SSC = ['GD32Evb.c', 'ecatappl.c', 'ecatcoe.c', 'ecatslv.c', 'mailbox.c',
-               'objdef.c', 'sdoserv.c', 'SSC-Device.c', 'coeappl.c']
     lib_set = set(args.lib_files)
-    # 应用层 SSC = 全部 - 进库的
-    app_ssc = [f for f in ALL_SSC if f not in lib_set]
 
-    # 应用工程固定包含的 Group（不变部分）
-    APP_GROUPS = {
-        'User': ['main.c', 'gd32f10x_it.c', 'systick.c'],
-        'Hardware': ['uart.c', 'spi_ecat.c', 'timer_ecat.c', 'gpio_ecat.c',
-                     'rfid_ecat.c', 'Application.c', 'App_Flash.c', 'wdg_ecat.c'],
-        'ECAT': ['ecat_api.c'],
-        'SSC': app_ssc,
-        'Firmware/CMSIS': ['startup_gd32f10x_md.s', 'system_gd32f10x.c'],
-    }
-    # Firmware/GD32_StdPeriph 14 个外设驱动（从干净版提取顺序）
-    # 注意：gd32f10x_it.c 属于 User Group（中断处理），不在外设驱动里，需排除
-    FW_FILES = [m.group(1) for m in re.finditer(
-        r'<FileName>(gd32f10x_\w+\.c)</FileName>', clean)
-        if m.group(1) != 'gd32f10x_it.c']
-    APP_GROUPS['Firmware/GD32_StdPeriph'] = FW_FILES
+    # 应用工程 Group：每个 Group 保留「未进库」的文件，保持原始顺序
+    APP_GROUPS = {}
+    for gn in group_order:
+        files_in_group = [fn for fn in all_files if file_group[fn] == gn and fn not in lib_set]
+        if files_in_group:
+            APP_GROUPS[gn] = files_in_group
 
-    # 库工程 Group：只含进库的 SSC 文件
-    LIB_GROUPS = {'SSC': args.lib_files}
+    # 库工程 Group：进库文件按原始 Group 归类
+    LIB_GROUPS = {}
+    for fn in args.lib_files:
+        if fn not in all_files:
+            print(f'!! 警告: {fn} 不在基线工程中，跳过', file=sys.stderr)
+            continue
+        gn = file_group[fn]
+        LIB_GROUPS.setdefault(gn, []).append(fn)
 
     def groups_xml(fm, add_lib=False):
         out = ['      <Groups>']
@@ -115,14 +117,16 @@ def main():
     with open('ECAT_Core.uvprojx', 'w', encoding='utf-8', newline='') as f:
         f.write(lib_proj)
 
-    # XML 合法性校验
+    # XML 合法性校验 + 打印
     import xml.etree.ElementTree as ET
     for fn in ['EtherCAT_RFID.uvprojx', 'ECAT_Core.uvprojx']:
         t = ET.parse(fn)
         for tg in t.getroot().find('Targets').findall('Target'):
             name = tg.find('TargetName').text
-            nfs = sum(len(g.findall('Files/File')) for g in tg.findall('Groups/Group'))
-            print(f'[{fn}] {name}: {nfs} files')
+            print(f'[{fn}] {name}:')
+            for g in tg.findall('Groups/Group'):
+                fns = [f.find('FileName').text for f in g.findall('Files/File')]
+                print(f'    {g.find("GroupName").text}: {len(fns)} files')
 
 if __name__ == '__main__':
     main()
