@@ -499,11 +499,6 @@
               <FilePath>..\SSC\ecatappl.c</FilePath>
             </File>
             <File>
-              <FileName>ecatslv.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\SSC\ecatslv.c</FilePath>
-            </File>
-            <File>
               <FileName>objdef.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\SSC\objdef.c</FilePath>

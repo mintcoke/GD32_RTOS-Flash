@@ -423,6 +423,11 @@
               <FileType>1</FileType>
               <FilePath>..\SSC\ecatcoe.c</FilePath>
             </File>
+            <File>
+              <FileName>ecatslv.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\SSC\ecatslv.c</FilePath>
+            </File>
           </Files>
         </Group>
       </Groups>
