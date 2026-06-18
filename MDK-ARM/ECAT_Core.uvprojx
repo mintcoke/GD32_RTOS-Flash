@@ -7,7 +7,7 @@
 
   <Targets>
     <Target>
-      <TargetName>Target 1</TargetName>
+      <TargetName>ECAT_Core</TargetName>
       <ToolsetNumber>0x4</ToolsetNumber>
       <ToolsetName>ARM-ADS</ToolsetName>
 <TargetOption>
@@ -46,11 +46,11 @@
             <NotGenerated>0</NotGenerated>
             <InvalidFlash>1</InvalidFlash>
           </TargetStatus>
-          <OutputDirectory>.\Objects\</OutputDirectory>
-          <OutputName>EtherCAT_RFID</OutputName>
-          <CreateExecutable>1</CreateExecutable>
-          <CreateLib>0</CreateLib>
-          <CreateHexFile>1</CreateHexFile>
+          <OutputDirectory>.\Lib\</OutputDirectory>
+          <OutputName>ECAT_Core</OutputName>
+          <CreateExecutable>0</CreateExecutable>
+          <CreateLib>1</CreateLib>
+          <CreateHexFile>0</CreateHexFile>
           <DebugInformation>1</DebugInformation>
           <BrowseInformation>1</BrowseInformation>
           <ListingPath>.\Listings\</ListingPath>
@@ -406,217 +406,12 @@
       </TargetOption>
       <Groups>
         <Group>
-          <GroupName>User</GroupName>
-          <Files>
-            <File>
-              <FileName>main.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\User\main.c</FilePath>
-            </File>
-            <File>
-              <FileName>gd32f10x_it.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\User\gd32f10x_it.c</FilePath>
-            </File>
-            <File>
-              <FileName>systick.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\User\systick.c</FilePath>
-            </File>
-          </Files>
-        </Group>
-        <Group>
-          <GroupName>Hardware</GroupName>
-          <Files>
-            <File>
-              <FileName>uart.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\Hardware\uart.c</FilePath>
-            </File>
-            <File>
-              <FileName>spi_ecat.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\Hardware\spi_ecat.c</FilePath>
-            </File>
-            <File>
-              <FileName>timer_ecat.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\Hardware\timer_ecat.c</FilePath>
-            </File>
-            <File>
-              <FileName>gpio_ecat.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\Hardware\gpio_ecat.c</FilePath>
-            </File>
-            <File>
-              <FileName>rfid_ecat.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>../Hardware/rfid_ecat.c</FilePath>
-            </File>
-            <File>
-              <FileName>Application.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\Hardware\Application.c</FilePath>
-            </File>
-            <File>
-              <FileName>App_Flash.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\Hardware\App_Flash.c</FilePath>
-            </File>
-            <File>
-              <FileName>wdg_ecat.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\Hardware\wdg_ecat.c</FilePath>
-            </File>
-          </Files>
-        </Group>
-        <Group>
-          <GroupName>ECAT</GroupName>
-          <Files>
-            <File>
-              <FileName>ecat_api.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\ECAT\ecat_api.c</FilePath>
-            </File>
-            <File>
-              <FileName>ECAT_Core.lib</FileName>
-              <FileType>4</FileType>
-              <FilePath>.\Lib\ECAT_Core.lib</FilePath>
-            </File>
-          </Files>
-        </Group>
-        <Group>
           <GroupName>SSC</GroupName>
           <Files>
             <File>
-              <FileName>GD32Evb.c</FileName>
+              <FileName>mailbox.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\SSC\GD32Evb.c</FilePath>
-            </File>
-            <File>
-              <FileName>ecatappl.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\SSC\ecatappl.c</FilePath>
-            </File>
-            <File>
-              <FileName>ecatcoe.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\SSC\ecatcoe.c</FilePath>
-            </File>
-            <File>
-              <FileName>ecatslv.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\SSC\ecatslv.c</FilePath>
-            </File>
-            <File>
-              <FileName>objdef.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\SSC\objdef.c</FilePath>
-            </File>
-            <File>
-              <FileName>sdoserv.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\SSC\sdoserv.c</FilePath>
-            </File>
-            <File>
-              <FileName>SSC-Device.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\SSC\SSC-Device.c</FilePath>
-            </File>
-            <File>
-              <FileName>coeappl.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\SSC\coeappl.c</FilePath>
-            </File>
-          </Files>
-        </Group>
-        <Group>
-          <GroupName>Firmware/CMSIS</GroupName>
-          <Files>
-            <File>
-              <FileName>startup_gd32f10x_md.s</FileName>
-              <FileType>2</FileType>
-              <FilePath>..\Firmware\CMSIS\GD\GD32F10x\Source\ARM\startup_gd32f10x_md.s</FilePath>
-            </File>
-            <File>
-              <FileName>system_gd32f10x.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\Firmware\CMSIS\GD\GD32F10x\Source\system_gd32f10x.c</FilePath>
-            </File>
-          </Files>
-        </Group>
-        <Group>
-          <GroupName>Firmware/GD32_StdPeriph</GroupName>
-          <Files>
-            <File>
-              <FileName>gd32f10x_adc.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\Firmware\GD32F10x_standard_peripheral\Source\gd32f10x_adc.c</FilePath>
-            </File>
-            <File>
-              <FileName>gd32f10x_crc.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\Firmware\GD32F10x_standard_peripheral\Source\gd32f10x_crc.c</FilePath>
-            </File>
-            <File>
-              <FileName>gd32f10x_dma.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\Firmware\GD32F10x_standard_peripheral\Source\gd32f10x_dma.c</FilePath>
-            </File>
-            <File>
-              <FileName>gd32f10x_exti.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\Firmware\GD32F10x_standard_peripheral\Source\gd32f10x_exti.c</FilePath>
-            </File>
-            <File>
-              <FileName>gd32f10x_fwdgt.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\Firmware\GD32F10x_standard_peripheral\Source\gd32f10x_fwdgt.c</FilePath>
-            </File>
-            <File>
-              <FileName>gd32f10x_i2c.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\Firmware\GD32F10x_standard_peripheral\Source\gd32f10x_i2c.c</FilePath>
-            </File>
-            <File>
-              <FileName>gd32f10x_gpio.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\Firmware\GD32F10x_standard_peripheral\Source\gd32f10x_gpio.c</FilePath>
-            </File>
-            <File>
-              <FileName>gd32f10x_rtc.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\Firmware\GD32F10x_standard_peripheral\Source\gd32f10x_rtc.c</FilePath>
-            </File>
-            <File>
-              <FileName>gd32f10x_spi.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\Firmware\GD32F10x_standard_peripheral\Source\gd32f10x_spi.c</FilePath>
-            </File>
-            <File>
-              <FileName>gd32f10x_timer.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\Firmware\GD32F10x_standard_peripheral\Source\gd32f10x_timer.c</FilePath>
-            </File>
-            <File>
-              <FileName>gd32f10x_usart.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\Firmware\GD32F10x_standard_peripheral\Source\gd32f10x_usart.c</FilePath>
-            </File>
-            <File>
-              <FileName>gd32f10x_misc.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\Firmware\GD32F10x_standard_peripheral\Source\gd32f10x_misc.c</FilePath>
-            </File>
-            <File>
-              <FileName>gd32f10x_rcu.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\Firmware\GD32F10x_standard_peripheral\Source\gd32f10x_rcu.c</FilePath>
-            </File>
-            <File>
-              <FileName>gd32f10x_fmc.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\Firmware\GD32F10x_standard_peripheral\Source\gd32f10x_fmc.c</FilePath>
+              <FilePath>..\SSC\mailbox.c</FilePath>
             </File>
           </Files>
         </Group>
