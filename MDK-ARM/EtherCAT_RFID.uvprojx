@@ -514,11 +514,6 @@
               <FilePath>..\SSC\objdef.c</FilePath>
             </File>
             <File>
-              <FileName>sdoserv.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\SSC\sdoserv.c</FilePath>
-            </File>
-            <File>
               <FileName>SSC-Device.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\SSC\SSC-Device.c</FilePath>

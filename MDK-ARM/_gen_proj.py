@@ -14,10 +14,12 @@ def main():
     ap.add_argument('--with-lib', action='store_true', help='应用工程引用 ECAT_Core.lib')
     args = ap.parse_args()
 
-    # 从 git 干净版读取
+    # 从全源码基线 commit 读取（固定 0cf5a3b，含全部 37 文件）
+    # 注意：不能用 HEAD，因为任务推进后 HEAD 的 uvprojx 已移除进库文件
+    BASELINE_COMMIT = '0cf5a3b'
     repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     clean = subprocess.check_output(
-        ['git', 'show', 'HEAD:MDK-ARM/EtherCAT_RFID.uvprojx'],
+        ['git', 'show', f'{BASELINE_COMMIT}:MDK-ARM/EtherCAT_RFID.uvprojx'],
         cwd=repo_root, text=True, encoding='utf-8')
 
     topt = re.search(r'<TargetOption>.*?</TargetOption>', clean, re.DOTALL).group(0)

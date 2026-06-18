@@ -413,6 +413,11 @@
               <FileType>1</FileType>
               <FilePath>..\SSC\mailbox.c</FilePath>
             </File>
+            <File>
+              <FileName>sdoserv.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\SSC\sdoserv.c</FilePath>
+            </File>
           </Files>
         </Group>
       </Groups>
