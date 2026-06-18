@@ -494,11 +494,6 @@
               <FilePath>..\SSC\GD32Evb.c</FilePath>
             </File>
             <File>
-              <FileName>ecatappl.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\SSC\ecatappl.c</FilePath>
-            </File>
-            <File>
               <FileName>objdef.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\SSC\objdef.c</FilePath>

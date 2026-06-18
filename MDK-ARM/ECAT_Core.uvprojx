@@ -428,6 +428,11 @@
               <FileType>1</FileType>
               <FilePath>..\SSC\ecatslv.c</FilePath>
             </File>
+            <File>
+              <FileName>ecatappl.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\SSC\ecatappl.c</FilePath>
+            </File>
           </Files>
         </Group>
       </Groups>
