@@ -30,6 +30,9 @@ DOC/~$*
 # ── Build logs ──
 MDK-ARM/build_log.txt
 
+# ── Claude Code worktrees (临时工作区，不纳入版本控制) ──
+.claude/worktrees/
+
 # ── OS ──
 Thumbs.db
 Desktop.ini
