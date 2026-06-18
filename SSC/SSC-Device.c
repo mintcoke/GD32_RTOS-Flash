@@ -30,6 +30,7 @@
 #define _SSC_DEVICE_ 1
 #include "SSC-Device.h"
 #include "Application.h"
+#include "GD32Evb.h"
 #undef _SSC_DEVICE_
 /*--------------------------------------------------------------------------------------
 ------
@@ -153,6 +154,8 @@ UINT16 APPL_StopInputHandler(void)
 
 UINT16 APPL_StartOutputHandler(void)
 {
+    /* SM Watchdog 配置由主站/ESC SII 决定。
+     * 已验证 PDI 写 0x0420 无法覆盖 KV-X310 配置的 WD Time。 */
     return ALSTATUSCODE_NOERROR;
 }
 

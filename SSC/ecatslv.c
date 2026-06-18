@@ -220,10 +220,6 @@ V4.00 ECAT 7: The return values for the AL-StatusCode were changed to UINT16
 -----------------------------------------------------------------------------------------*/
 UINT16    u16ALEventMask;                      // Value which will be written to the 0x204 register (AL event mask) during the state transition PreOP to SafeOP
 
-UINT16    g_EcatLastAlEvent = 0;
-UINT16    g_EcatLastAlControl = 0;
-UINT32    g_EcatAlControlCount = 0;
-
 /*Dummy variable to trigger read or writes events in the ESC*/
     VARVOLATILE UINT16    u16dummy;
 
@@ -402,6 +398,7 @@ UINT8    CheckSmSettings(UINT8 maxChannel)
     TSYNCMAN ESCMEM *pSyncMan;
     UINT16 SMLength = 0;
     UINT16 SMAddress = 0;
+
 
 
         //Check if max address defines are within the available ESC address range
@@ -2229,6 +2226,10 @@ void DC_CheckWatchdog(void)
  \brief    Checks communication and synchronisation variables and update AL status / AL status code if an error has occurred
 
 *////////////////////////////////////////////////////////////////////////////////////////
+#ifndef ECAT_IGNORE_SM_WD_ERROR
+#define ECAT_IGNORE_SM_WD_ERROR 1
+#endif
+
 void CheckIfEcatError(void)
 {
    /*if the watchdog is enabled check the the process data watchdog in the ESC
@@ -2248,8 +2249,16 @@ void CheckIfEcatError(void)
          if (bEcatOutputUpdateRunning
             )
          {
+#if ECAT_IGNORE_SM_WD_ERROR
+            /* KV-X310 配置的 ESC SM Watchdog 时间为 62.5ms，
+             * 且 TR8253 的 0x0420 对 PDI 只读，GD32 无法放宽该时间。
+             * 当前项目选择忽略 ESC SM WD 触发，避免偶发主站 PDO 间隔
+             * 超过 62.5ms 时从 OP 掉到 SAFEOP。 */
+            bEcatFirstOutputsReceived = TRUE;
+#else
             AL_ControlInd(STATE_SAFEOP, ALSTATUSCODE_SMWATCHDOG);
             return;
+#endif
          }
 
          else
@@ -2501,7 +2510,6 @@ void ECAT_Main(void)
     /* Read AL Event-Register from ESC */
     ALEventReg = HW_GetALEventRegister();
     ALEventReg = SWAPWORD(ALEventReg);
-    g_EcatLastAlEvent = ALEventReg;
 
 
     if ((ALEventReg & AL_CONTROL_EVENT) && !bEcatWaitForAlControlRes)
@@ -2510,8 +2518,6 @@ void ECAT_Main(void)
           (that the corresponding bit in the AL Event register will be reset) */
         HW_EscReadWord( EscAlControl, ESC_AL_CONTROL_OFFSET);
         EscAlControl = SWAPWORD(EscAlControl);
-        g_EcatLastAlControl = EscAlControl;
-        g_EcatAlControlCount++;
 
 
         /* reset AL Control event and the SM Change event (because the Sync Manager settings will be checked
@@ -2592,7 +2598,6 @@ void ECAT_Main(void)
         /* Reload the AlEvent because it may be changed due to a SM disable, enable in case of an repeat request */
         ALEventReg = HW_GetALEventRegister();
         ALEventReg = SWAPWORD(ALEventReg);
-        g_EcatLastAlEvent = ALEventReg;
 
         if ( ALEventReg & (MAILBOX_WRITE_EVENT) )
         {

@@ -463,6 +463,11 @@
               <FileType>1</FileType>
               <FilePath>..\Hardware\App_Flash.c</FilePath>
             </File>
+            <File>
+              <FileName>wdg_ecat.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Hardware\wdg_ecat.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>

@@ -180,8 +180,6 @@ PROTO void   PDI_ClearTimer(void);
 PROTO void ESC_INT_Callback(void);
 PROTO void SYNC0_INT_Callback(void);
 
-PROTO volatile uint32_t g_EscIntCount;
-
 #undef PROTO
 
 #include "ecat_hw_if.h"

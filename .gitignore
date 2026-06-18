@@ -23,6 +23,13 @@ MDK-ARM/*.uvguix.*
 # ── Office temp files ──
 DOC/~$*
 
+# ── Backup files ──
+*.bak.docx
+*.bak
+
+# ── Build logs ──
+MDK-ARM/build_log.txt
+
 # ── OS ──
 Thumbs.db
 Desktop.ini

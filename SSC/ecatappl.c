@@ -139,6 +139,7 @@ V4.00 APPL 6: The main function was split in MainInit and MainLoop
 #undef _APPL_INTERFACE_
 
 #include "SSC-Device.h"
+#include "systick.h"
 
 
 
@@ -860,7 +861,6 @@ UINT16 MainInit(void)
     /* initialize the objects */
     COE_ObjInit();
 
-
     /*indicate that the slave stack initialization finished*/
     bInitFinished = TRUE;
 
@@ -926,14 +926,11 @@ UINT16 MainInit(void)
 
 void MainLoop(void)
 {
-    
     /*return if initialization not finished */
     if(bInitFinished == FALSE)
     {
         return;
     }
-
-
 
         /* FreeRun-Mode:  bEscIntEnabled = FALSE, bDcSyncActive = FALSE
            Synchron-Mode: bEscIntEnabled = TRUE, bDcSyncActive = FALSE
@@ -956,6 +953,8 @@ void MainLoop(void)
            execution with PDI_Isr(). */
         if ( !bDcSyncActive )
         {
+            BOOL bRunApplicationFromMainLoop = FALSE;
+
             /* if the application is running in ECAT Synchron Mode the function ECAT_Application is called
                from the ESC interrupt routine (in mcihw.c or spihw.c),
                in ECAT Synchron Mode it should be additionally checked, if the SM-event is received
@@ -978,6 +977,7 @@ void MainLoop(void)
                         /* update the outputs */
                         PDO_OutputMapping();
                     }
+                    bRunApplicationFromMainLoop = TRUE;
                 }
                 else if ( nPdOutputSize == 0 )
                 {
@@ -988,14 +988,18 @@ void MainLoop(void)
                         bEcatFirstOutputsReceived = TRUE;
                     }
                 }
+
+                if (!bEscIntEnabled)
+                {
+                    /* FreeRun 模式由主循环持续驱动应用层 */
+                    bRunApplicationFromMainLoop = TRUE;
+                }
             }
 
-            /* BUGFIX: When ESC interrupt is enabled but not firing (e.g.
-               SYNCTYPE_SM_SYNCHRON with TR8253+GD32 SPI, where EXTI stops
-               after initial transitions), we must also poll for output events
-               here so that PDO_OutputMapping() runs and the master's output
-               data reaches the local variables.  Without this, the application
-               reads stale/zero output data. */
+            /* In SM Sync mode the normal path is PDI_Isr().
+               Only if an output event is pending while no ISR handled it do we
+               take over from the main loop as a fallback. This avoids running
+               ECAT_Application/PDO twice for every bus cycle. */
             if ( bEscIntEnabled && bEcatFirstOutputsReceived
                 && bEcatOutputUpdateRunning )
             {
@@ -1004,23 +1008,38 @@ void MainLoop(void)
 
                 if ( ALEvent & PROCESS_OUTPUT_EVENT )
                 {
-                    PDO_OutputMapping();
+                    bRunApplicationFromMainLoop = TRUE;
                 }
             }
 
-/*ECATCHANGE_START(V5.12) ECAT3*/
-            DISABLE_ESC_INT();
-/*ECATCHANGE_END(V5.12) ECAT3*/
-             ECAT_Application();
-
-            if ( bEcatInputUpdateRunning )
+            if (bRunApplicationFromMainLoop)
             {
-                /* EtherCAT slave is at least in SAFE-OPERATIONAL, update inputs */
-                PDO_InputMapping();
-            }
 /*ECATCHANGE_START(V5.12) ECAT3*/
-            ENABLE_ESC_INT();
+                DISABLE_ESC_INT();
 /*ECATCHANGE_END(V5.12) ECAT3*/
+                if ( bEscIntEnabled && bEcatFirstOutputsReceived
+                    && bEcatOutputUpdateRunning )
+                {
+                    UINT16 ALEvent = HW_GetALEventRegister();
+                    ALEvent = SWAPWORD(ALEvent);
+
+                    if ( ALEvent & PROCESS_OUTPUT_EVENT )
+                    {
+                        PDO_OutputMapping();
+                    }
+                }
+
+                ECAT_Application();
+
+                if ( bEcatInputUpdateRunning )
+                {
+                    /* EtherCAT slave is at least in SAFE-OPERATIONAL, update inputs */
+                    PDO_InputMapping();
+                }
+/*ECATCHANGE_START(V5.12) ECAT3*/
+                ENABLE_ESC_INT();
+/*ECATCHANGE_END(V5.12) ECAT3*/
+            }
         }
 
         /* there is no interrupt routine for the hardware timer so check the timer register if the desired cycle elapsed*/
@@ -1047,6 +1066,7 @@ void MainLoop(void)
 
         /* call lower prior application part */
        COE_Main();
+
        CheckIfEcatError();
 
 
@@ -1137,11 +1157,6 @@ void ECAT_Application(void)
     }/* measurement started*/
 /*ECATCHANGE_END(V5.12) ECAT1*/
 #endif /* #if MIN_PD_CYCLE_TIME == 0 */
-}
-
-uint16_t ECAT_GetSyncType_Impl(void)
-{
-    return sSyncManOutPar.u16SyncType;
 }
 
 

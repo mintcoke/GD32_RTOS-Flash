@@ -40,7 +40,6 @@ typedef union
 ------    Internal Variables
 --------------------------------------------------------------------------------------*/
 UALEVENT         EscALEvent;  /* AL Event register (0x220) content, updated on each ESC access */
-volatile uint32_t g_EscIntCount = 0;  /* ESC interrupt counter — counts EtherCAT frames */
 
 /*--------------------------------------------------------------------------------------
 ------    Local Function: RxTxSpiData (single byte SPI exchange)
@@ -159,7 +158,6 @@ void PDI_ClearTimer(void)
 
 void ESC_INT_Callback(void)
 {
-    g_EscIntCount++;
     PDI_Isr();
     exti_flag_clear(ESC_INT_EXTI_LINE);
 }
@@ -237,30 +235,30 @@ UINT16 HW_GetALEventRegister_Isr(void)
 
 void HW_EscRead(MEM_ADDR *pData, UINT16 Address, UINT16 Len)
 {
-    /* Read byte-by-byte with interrupts disabled to prevent
-       mailbox reading corruption from AL Event ISR */
     UINT16 i = Len;
+    UINT8 data = 0U;
     UINT8 *pTmpData = (UINT8 *)pData;
+
+    DISABLE_GLOBAL_INT;
+
+    /* Keep one ESC SPI transaction per block. Re-addressing every byte makes
+       1020-byte PDO transfers take tens of ms and can trip the SM watchdog. */
+    AddressingEsc(Address, ESC_RD);
 
     while (i-- > 0)
     {
-        DISABLE_GLOBAL_INT;
-
-        AddressingEsc(Address, ESC_RD);
-
-        /* Each byte read with new addressing, out data is 0xFF */
-        *pTmpData = RxTxSpiData(0xFF);
+        if (i == 0U)
+        {
+            /* Last byte: DI pin must be 1 */
+            data = 0xFFU;
+        }
+        *pTmpData = RxTxSpiData(data);
         pTmpData++;
-
-        /* At least 15ns + CLK/2 after transmission before CS goes high */
-        DESELECT_SPI
-
-        ENABLE_GLOBAL_INT;
-        __ISB();
-        for(volatile int _d=0; _d<80; _d++) __NOP();  /* ~1us gap for USART IRQ */
-
-        Address++;
     }
+
+    DESELECT_SPI
+
+    ENABLE_GLOBAL_INT;
 }
 
 void HW_EscReadIsr(MEM_ADDR *pData, UINT16 Address, UINT16 Len)
@@ -297,25 +295,20 @@ void HW_EscWrite(MEM_ADDR *pData, UINT16 Address, UINT16 Len)
     VARVOLATILE UINT8 dummy;
     UINT8 *pTmpData = (UINT8 *)pData;
 
+    DISABLE_GLOBAL_INT;
+
+    /* Keep one ESC SPI transaction per block, same as ISR path. */
+    AddressingEsc(Address, ESC_WR);
+
     while (i-- > 0)
     {
-        /* Each byte written separately with interrupts disabled
-           to prevent AL Event ISR corruption */
-        DISABLE_GLOBAL_INT;
-
-        AddressingEsc(Address, ESC_WR);
-
         dummy = RxTxSpiData(*pTmpData);
         pTmpData++;
-
-        DESELECT_SPI
-
-        ENABLE_GLOBAL_INT;
-        __ISB();
-        for(volatile int _d=0; _d<80; _d++) __NOP();
-
-        Address++;
     }
+
+    DESELECT_SPI
+
+    ENABLE_GLOBAL_INT;
 }
 
 void HW_EscWriteIsr(MEM_ADDR *pData, UINT16 Address, UINT16 Len)
