@@ -433,6 +433,16 @@
               <FileType>1</FileType>
               <FilePath>..\SSC\ecatappl.c</FilePath>
             </File>
+            <File>
+              <FileName>objdef.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\SSC\objdef.c</FilePath>
+            </File>
+            <File>
+              <FileName>coeappl.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\SSC\coeappl.c</FilePath>
+            </File>
           </Files>
         </Group>
       </Groups>

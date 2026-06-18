@@ -494,19 +494,9 @@
               <FilePath>..\SSC\GD32Evb.c</FilePath>
             </File>
             <File>
-              <FileName>objdef.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\SSC\objdef.c</FilePath>
-            </File>
-            <File>
               <FileName>SSC-Device.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\SSC\SSC-Device.c</FilePath>
-            </File>
-            <File>
-              <FileName>coeappl.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\SSC\coeappl.c</FilePath>
             </File>
           </Files>
         </Group>
