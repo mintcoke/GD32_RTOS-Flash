@@ -36,7 +36,6 @@ void (*g_pfnRxPdoMapping)(UINT16* pData) = 0;  /* RxPDO 映射函数 */
 /* 用户回调函数指针（通过 ECAT_Register* 注册） */
 static ecat_periodic_cb_t    s_pfnUserPeriodic = 0;  /* 用户周期性回调 */
 static ecat_safe_output_cb_t s_pfnUserSafeOut  = 0;  /* 用户安全输出回调 */
-static sonar_fail_cb_t       s_pfnSonarFail    = 0;  /* 超声波故障回调（未使用） */
 
 /* ============================================================
  * PDO 映射函数 — SSC 在 PDO 交换周期中调用
@@ -118,17 +117,6 @@ void ECAT_RegisterPeriodicTask(ecat_periodic_cb_t cb)
 void ECAT_RegisterSafeOutput(ecat_safe_output_cb_t cb)
 {
     s_pfnUserSafeOut = cb;
-}
-
-/* 注册超声波故障回调（历史遗留，未使用） */
-void ECAT_RegisterSonarFailCallback(sonar_fail_cb_t cb)
-{
-    s_pfnSonarFail = cb;
-}
-
-void ECAT_CheckSonarFail(void)
-{
-    if (s_pfnSonarFail) s_pfnSonarFail();
 }
 
 /* ============================================================

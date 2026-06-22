@@ -7,11 +7,11 @@
  *   1. 在 ecat_api.h 的 PersistentParams_t 里加新字段
  *   2. 在业务代码里直接读写 g_PersistentParams
  *
- *   存: g_PersistentParams.sonar_zero_offset = 1.5f;
+ *   存: g_PersistentParams.modbus_slave_addr = 5;
  *       ECAT_SetParamDirty();
  *       // 下个 ECAT_Stack_MainLoop 循环自动保存
  *
- *   读: float val = g_PersistentParams.sonar_zero_offset;
+ *   读: uint16_t addr = g_PersistentParams.modbus_slave_addr;
  *       // 上电时已自动从 Flash 恢复, 直接读即可
  *
  * 新增参数只需改 ecat_api.h 里的 PersistentParams_t 结构体,
@@ -120,7 +120,6 @@ void App_Load_Params_From_Flash(void)
  * 在 Application.c 或其他业务文件中这样用:
  *
  * // --- 读参数 (上电后随时读, 已自动从 Flash 恢复) ---
- * float offset = g_PersistentParams.sonar_zero_offset;
  * uint16_t addr = g_PersistentParams.modbus_slave_addr;
  *
  * // --- 改参数并保存 ---

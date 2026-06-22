@@ -36,11 +36,6 @@
 extern "C" {
 #endif
 
-/* 以下为历史遗留的超声波传感器配置，当前项目使用 RFID，仅供参考 */
-#define SONAR_BAUD       115200  /* 超声波串口波特率（未使用） */
-#define SONAR_TRIG_MS    50      /* 超声波触发间隔（未使用） */
-#define SONAR_NO_DATA    0xFFFF  /* 超声波无数据标志（未使用） */
-
 /* PDO 大小配置
  * TxPDO = 510 个 UINT16 = 1020 字节
  * RxPDO = 510 个 UINT16 = 1020 字节
@@ -162,8 +157,6 @@ extern "C" {
  * 主站可通过 CoE (CAN over EtherCAT) 读写这些参数
  */
 typedef struct {
-    float    sonar_zero_offset;    /* 零点偏移（历史遗留，未使用） */
-    float    sonar_scale_factor;   /* 缩放因子（历史遗留，未使用） */
     uint16_t modbus_slave_addr;    /* Modbus 从站地址（历史遗留，未使用） */
     uint16_t baudrate_code;        /* 波特率编码（历史遗留，未使用） */
     uint32_t reserved[8];          /* 保留字段 */
@@ -200,11 +193,6 @@ void ECAT_RegisterPeriodicTask(ecat_periodic_cb_t cb);
 typedef void (*ecat_safe_output_cb_t)(void);
 /* 注册安全输出回调 — EtherCAT 进入 SAFE-OP 时调用，用于设置输出为安全值 */
 void ECAT_RegisterSafeOutput(ecat_safe_output_cb_t cb);
-
-typedef void (*sonar_fail_cb_t)(void);
-/* 注册超声波故障回调（历史遗留，未使用） */
-void ECAT_RegisterSonarFailCallback(sonar_fail_cb_t cb);
-void ECAT_CheckSonarFail(void);
 
 /* ============================================================
  * 持久化参数 — Flash 读写
