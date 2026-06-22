@@ -92,7 +92,7 @@ static void rfid_rx_dma_start(void)
     dma_struct_para_init(&dma_init_struct);
     dma_init_struct.periph_addr  = (uint32_t)&USART_DATA(RFID_USART);
     dma_init_struct.periph_width = DMA_PERIPHERAL_WIDTH_8BIT;
-    dma_init_struct.periph_inc   = DMA_PERIPHERAL_INCREASE_DISABLE;
+    dma_init_struct.periph_inc   = DMA_PERIPH_INCREASE_DISABLE;
     dma_init_struct.memory_addr  = (uint32_t)s_RxDmaBuf;
     dma_init_struct.memory_width = DMA_MEMORY_WIDTH_8BIT;
     dma_init_struct.memory_inc   = DMA_MEMORY_INCREASE_ENABLE;
@@ -228,7 +228,7 @@ static int rfid_tx_dma_send(const uint8_t *buf, uint16_t len)
     dma_struct_para_init(&dma_init_struct);
     dma_init_struct.periph_addr  = (uint32_t)&USART_DATA(RFID_USART);
     dma_init_struct.periph_width = DMA_PERIPHERAL_WIDTH_8BIT;
-    dma_init_struct.periph_inc   = DMA_PERIPHERAL_INCREASE_DISABLE;
+    dma_init_struct.periph_inc   = DMA_PERIPH_INCREASE_DISABLE;
     dma_init_struct.memory_addr  = (uint32_t)buf;
     dma_init_struct.memory_width = DMA_MEMORY_WIDTH_8BIT;
     dma_init_struct.memory_inc   = DMA_MEMORY_INCREASE_ENABLE;
