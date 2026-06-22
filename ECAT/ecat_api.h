@@ -45,6 +45,12 @@ extern "C" {
 #define PDO_TX_MAX       0x400   /* ESC TxPDO 最大字节数 */
 #define PDO_RX_MAX       0x400   /* ESC RxPDO 最大字节数 */
 
+/* 应用层看门狗超时（毫秒）
+ * 主站停止发送 PDO 数据超过此时间，调用 ECAT_RegisterSafeOutput 注册的
+ * 安全输出回调。设为 0 表示禁用本机制（依赖 ESC SM 看门狗 + ECAT_IGNORE_SM_WD_ERROR）。
+ * 当前 APPL_SafeOutput 为空实现，故保持禁用。 */
+#define ECAT_WD_TIMEOUT_MS    0U
+
 /*
  * 统一 PDO 访问宏
  *

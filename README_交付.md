@@ -95,7 +95,7 @@
 
 1. 解压交付包，保持目录结构不变（`MDK-ARM/Lib/ECAT_Core.lib` 路径不能动）
 2. 双击 `MDK-ARM/EtherCAT_RFID.uvprojx`
-3. 确认 Target 选 `Target 1`（不是 ECAT_Core，那是库工程，不在交付包内）
+3. 确认 Target 选 `EtherCAT_RFID`
 
 ### 2.3 编译
 
