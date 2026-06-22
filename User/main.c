@@ -52,9 +52,7 @@ int main(void)
     MX_SPI1_Init();                         /* SPI1 → ESC */
     MX_TIM2_Init();
 
-    ECAT_Stack_Init();                      /* ESC + SSC 状态机 */
-    ECAT_RegisterPeriodicTask(APPL_UpdateTxPdo);
-    ECAT_RegisterSafeOutput(APPL_SafeOutput);
+    ECAT_Stack_Init();                      /* ESC + SSC 状态机(内部挂接 APPL_* 回调) */
 
     RFID_Init();                            /* USART0 + DMA + 天线 GPIO */
     WDG_Init();                             /* FWDGT 5s 超时 */

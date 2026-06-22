@@ -13,33 +13,31 @@
 #include "applInterface.h"
 #include "SSC-Device.h"
 #include "GD32Evb.h"
+#include "Application.h"
 #include "App_Flash.h"
 #include "gd32f10x.h"
 #include "systick.h"
 #include "wdg_ecat.h"
 #include <string.h>
 
-/* ---- SSC 桥接函数指针 — SSC 协议栈通过这些指针调用应用层 ---- */
+/* ---- SSC 桥接函数指针 — SSC 协议栈(SSC-Device.c 等)通过这些指针调用应用层 ---- */
 
-void (*g_pfnPeriodicTask)(void)          = 0;  /* 周期性任务（APPL_UpdateTxPdo） */
-void (*g_pfnSafeOutput)(void)            = 0;  /* 安全输出（APPL_SafeOutput） */
-void (*g_pfnTxPdoMapping)(UINT16* pData) = 0;
-void (*g_pfnRxPdoMapping)(UINT16* pData) = 0;
-
-static ecat_periodic_cb_t    s_pfnUserPeriodic = 0;
-static ecat_safe_output_cb_t s_pfnUserSafeOut  = 0;
+void (*g_pfnPeriodicTask)(void)          = 0;  /* 周期性任务，挂 APPL_UpdateTxPdo */
+void (*g_pfnSafeOutput)(void)            = 0;  /* 安全输出，挂 APPL_SafeOutput */
+void (*g_pfnTxPdoMapping)(UINT16* pData) = 0;  /* TxPDO 映射，挂 APPL_CoeTxPdoMapping */
+void (*g_pfnRxPdoMapping)(UINT16* pData) = 0;  /* RxPDO 映射，挂 APPL_CoeRxPdoMapping */
 
 /* ---- PDO 映射 — SSC 在 PDO 交换周期中调用 ---- */
 
 /* TxPDO: 应用数据 → ESC。DIUnit 拷到 ESC 缓冲区，主站即可读到。
  * 分两段：pData[0..254]←DIUnit10x6000(主段), pData[255..509]←DIUnit30x6001(副段)。
- * 先调用户周期回调更新 DI 数据(天线 RSSI/EPC)。 */
+ * 先调周期回调更新 DI 数据(天线 RSSI/EPC)。 */
 void APPL_CoeTxPdoMapping(UINT16* pData)
 {
     const uint16_t second_words = (uint16_t)(PDO_TX_UINT16 - 255U);
 
-    if (s_pfnUserPeriodic) {
-        s_pfnUserPeriodic();
+    if (g_pfnPeriodicTask) {
+        g_pfnPeriodicTask();
     }
 
     memcpy(pData,       &DIUnit10x6000.u16SubIndex0 + 1, sizeof(DIUnit10x6000.aEntries));
@@ -56,43 +54,15 @@ void APPL_CoeRxPdoMapping(UINT16* pData)
     memcpy(&DOUnit40x7001.u16SubIndex0 + 1, pData + 255, (size_t)second_words * sizeof(uint16_t));
 }
 
-/* ---- 桥接回调 — SSC 经 g_pfn* 调用，转发给用户回调 ---- */
-
-static void Bridge_PeriodicTask(void)
-{
-    if (s_pfnUserPeriodic) {
-        s_pfnUserPeriodic();
-    }
-}
-
-static void Bridge_SafeOutput(void)
-{
-    if (s_pfnUserSafeOut) {
-        s_pfnUserSafeOut();
-    }
-}
-
-/* ---- 回调注册 — 在 main() 中调用 ---- */
-
-void ECAT_RegisterPeriodicTask(ecat_periodic_cb_t cb)
-{
-    s_pfnUserPeriodic = cb;
-}
-
-void ECAT_RegisterSafeOutput(ecat_safe_output_cb_t cb)
-{
-    s_pfnUserSafeOut = cb;
-}
-
 /* ---- 协议栈核心 ---- */
 
-/* 初始化协议栈：注册桥接指针 → 初始化 ESC(SPI, 重试3次) → 加载 Flash 参数 → MainInit */
+/* 初始化协议栈：挂接回调 → 初始化 ESC(SPI, 重试3次) → 加载 Flash 参数 → MainInit */
 void ECAT_Stack_Init(void)
 {
     int retry = 0;
 
-    g_pfnPeriodicTask = Bridge_PeriodicTask;
-    g_pfnSafeOutput = Bridge_SafeOutput;
+    g_pfnPeriodicTask = APPL_UpdateTxPdo;
+    g_pfnSafeOutput = APPL_SafeOutput;
     g_pfnTxPdoMapping = APPL_CoeTxPdoMapping;
     g_pfnRxPdoMapping = APPL_CoeRxPdoMapping;
 

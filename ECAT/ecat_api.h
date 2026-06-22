@@ -129,14 +129,6 @@ void ECAT_Stack_Init(void);       /* 初始化协议栈(ESC、SSC、对象字典
 void ECAT_Stack_MainLoop(void);   /* 驱动主循环，须高频调用，否则通信中断 */
 void ECAT_KeepAlive(void);        /* = MainLoop + WDG_Feed，RFID 阻塞期间保活 */
 
-/* ---- 回调注册 — main() 中调用 ---- */
-
-typedef void (*ecat_periodic_cb_t)(void);
-void ECAT_RegisterPeriodicTask(ecat_periodic_cb_t cb);  /* 每 PDO 周期调一次 */
-
-typedef void (*ecat_safe_output_cb_t)(void);
-void ECAT_RegisterSafeOutput(ecat_safe_output_cb_t cb);  /* 进入 SAFE-OP 时调 */
-
 /* ---- 持久化参数 ---- */
 
 uint32_t ECAT_GetParamSize(void);
