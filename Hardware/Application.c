@@ -426,7 +426,7 @@ static void RFID_EcatDelayMs(uint32_t ms)
  * 天线数据 → TxPDO 映射
  *
  * 将每个天线的 RSSI/EPC_LEN/NEW/EPC 写入 TxPDO 对应位置。
- * 在 DO_LED_Ctrl() 中被调用（每个 PDO 周期一次）。
+ * 在 APPL_UpdateTxPdo() 中被调用（每个 PDO 周期一次）。
  * ============================================================ */
 static void RFID_MapAntennaToPdo(uint8_t ant_idx, uint16_t pdo_base)
 {
@@ -818,7 +818,7 @@ uint8_t RFID_EcatCmdTask(void)
 }
 
 /* ============================================================
- * DO_LED_Ctrl — 周期性任务（每个 PDO 周期调用一次）
+ * APPL_UpdateTxPdo — 周期性任务（每个 PDO 周期调用一次）
  *
  * 由 ECAT_RegisterPeriodicTask() 注册，
  * 在 APPL_CoeTxPdoMapping() → Bridge_PeriodicTask() 中被调用。
@@ -827,7 +827,7 @@ uint8_t RFID_EcatCmdTask(void)
  *   1. 递增心跳计数器 → DI(0)
  *   2. 将 3 个天线的标签数据映射到 TxPDO
  * ============================================================ */
-void DO_LED_Ctrl(void)
+void APPL_UpdateTxPdo(void)
 {
     static uint16_t s_Counter = 0;
     static const uint16_t rfid_pdo_base[RFID_ANT_COUNT] = {
@@ -847,10 +847,10 @@ void DO_LED_Ctrl(void)
 }
 
 /* ============================================================
- * DO_LED_Off — 安全输出（进入 SAFE-OP 时调用）
+ * APPL_SafeOutput — 安全输出（进入 SAFE-OP 时调用）
  *
  * 当前无安全输出需求，保留为空函数。
  * ============================================================ */
-void DO_LED_Off(void)
+void APPL_SafeOutput(void)
 {
 }

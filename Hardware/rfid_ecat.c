@@ -1009,7 +1009,7 @@ uint8_t RFID_WatchdogCheck(void)
 #define RFID_LOST_HOLD_MS 180U      /* 标签丢失保持时间 */
 #define RFID_LOST_CLEAR_COUNT 2U    /* 连续丢失次数阈值 */
 
-/* 每个天线的标签数据（由 DO_LED_Ctrl 映射到 TxPDO） */
+/* 每个天线的标签数据（由 APPL_UpdateTxPdo 映射到 TxPDO） */
 uint8_t g_RfidRssi  [RFID_ANT_COUNT];
 uint8_t g_RfidEpcLen[RFID_ANT_COUNT];
 uint8_t g_RfidNew   [RFID_ANT_COUNT];

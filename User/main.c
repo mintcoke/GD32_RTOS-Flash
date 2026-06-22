@@ -75,8 +75,8 @@ int main(void)
 
     /* ---- EtherCAT 协议栈初始化 ---- */
     ECAT_Stack_Init();                      /* 初始化 ESC + SSC 状态机 */
-    ECAT_RegisterPeriodicTask(DO_LED_Ctrl); /* 注册周期性任务：每个 PDO 周期更新天线数据 */
-    ECAT_RegisterSafeOutput(DO_LED_Off);    /* 注册安全输出：SAFE-OP 时关闭 LED */
+    ECAT_RegisterPeriodicTask(APPL_UpdateTxPdo); /* 注册周期性任务：每个 PDO 周期更新天线数据 */
+    ECAT_RegisterSafeOutput(APPL_SafeOutput);    /* 注册安全输出：SAFE-OP 时调用（当前空实现） */
 
     /* ---- RFID 模块初始化 ---- */
     RFID_Init();                            /* USART0 + DMA + 天线 GPIO */

@@ -28,8 +28,8 @@
  * SSC 桥接函数指针 — SSC 协议栈通过这些指针调用应用层
  * ============================================================ */
 
-void (*g_pfnPeriodicTask)(void)          = 0;  /* 周期性任务（DO_LED_Ctrl） */
-void (*g_pfnSafeOutput)(void)            = 0;  /* 安全输出（DO_LED_Off） */
+void (*g_pfnPeriodicTask)(void)          = 0;  /* 周期性任务（APPL_UpdateTxPdo） */
+void (*g_pfnSafeOutput)(void)            = 0;  /* 安全输出（APPL_SafeOutput） */
 void (*g_pfnTxPdoMapping)(UINT16* pData) = 0;  /* TxPDO 映射函数 */
 void (*g_pfnRxPdoMapping)(UINT16* pData) = 0;  /* RxPDO 映射函数 */
 
@@ -107,13 +107,13 @@ static void Bridge_SafeOutput(void)
  * 回调注册函数 — 在 main() 中调用
  * ============================================================ */
 
-/* 注册周期性任务回调（当前注册的是 DO_LED_Ctrl） */
+/* 注册周期性任务回调（当前注册的是 APPL_UpdateTxPdo） */
 void ECAT_RegisterPeriodicTask(ecat_periodic_cb_t cb)
 {
     s_pfnUserPeriodic = cb;
 }
 
-/* 注册安全输出回调（当前注册的是 DO_LED_Off） */
+/* 注册安全输出回调（当前注册的是 APPL_SafeOutput） */
 void ECAT_RegisterSafeOutput(ecat_safe_output_cb_t cb)
 {
     s_pfnUserSafeOut = cb;

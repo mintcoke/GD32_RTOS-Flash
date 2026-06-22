@@ -4,8 +4,8 @@
 #include "ecat_api.h"
 #include "gd32f10x.h"
 
-void DO_LED_Ctrl(void);
-void DO_LED_Off(void);
+void APPL_UpdateTxPdo(void);
+void APPL_SafeOutput(void);
 uint8_t RFID_EcatCmdTask(void);
 
 #endif
