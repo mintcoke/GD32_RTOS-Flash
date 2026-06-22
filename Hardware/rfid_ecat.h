@@ -32,10 +32,6 @@
 #define RFID_EN_ON()         gpio_bit_set(RFID_EN_PORT, RFID_EN_PIN)
 #define RFID_EN_OFF()        gpio_bit_reset(RFID_EN_PORT, RFID_EN_PIN)
 
-/* PA12 是模块使能(非 RS485 方向)，保留旧别名兼容 */
-#define RFID_EN_TX()         RFID_EN_ON()
-#define RFID_EN_RX()         RFID_EN_ON()
-
 /* 天线选择 PB14=S1(LSB) PB13=S2 PB12=S3, 000=天线1..111=天线8, 当前用 ANT1~3 */
 #define RFID_ANT_PORT        GPIOB
 #define RFID_ANT_S1          GPIO_PIN_14
