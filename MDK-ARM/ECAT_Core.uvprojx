@@ -520,6 +520,31 @@
             </File>
           </Files>
         </Group>
+        <Group>
+          <GroupName>Hardware</GroupName>
+          <Files>
+            <File>
+              <FileName>spi_ecat.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Hardware\spi_ecat.c</FilePath>
+            </File>
+            <File>
+              <FileName>timer_ecat.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Hardware\timer_ecat.c</FilePath>
+            </File>
+            <File>
+              <FileName>gpio_ecat.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Hardware\gpio_ecat.c</FilePath>
+            </File>
+            <File>
+              <FileName>wdg_ecat.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Hardware\wdg_ecat.c</FilePath>
+            </File>
+          </Files>
+        </Group>
       </Groups>
     </Target>
   </Targets>

@@ -7,10 +7,10 @@
 
   <Targets>
     <Target>
-      <TargetName>Target 1</TargetName>
+      <TargetName>EtherCAT_RFID</TargetName>
       <ToolsetNumber>0x4</ToolsetNumber>
       <ToolsetName>ARM-ADS</ToolsetName>
-<TargetOption>
+      <TargetOption>
         <TargetCommonOption>
           <Device>GD32F103CB</Device>
           <Vendor>GigaDevice</Vendor>
@@ -434,21 +434,6 @@
               <FilePath>..\Hardware\uart.c</FilePath>
             </File>
             <File>
-              <FileName>spi_ecat.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\Hardware\spi_ecat.c</FilePath>
-            </File>
-            <File>
-              <FileName>timer_ecat.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\Hardware\timer_ecat.c</FilePath>
-            </File>
-            <File>
-              <FileName>gpio_ecat.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\Hardware\gpio_ecat.c</FilePath>
-            </File>
-            <File>
               <FileName>rfid_ecat.c</FileName>
               <FileType>1</FileType>
               <FilePath>../Hardware/rfid_ecat.c</FilePath>
@@ -462,11 +447,6 @@
               <FileName>App_Flash.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\Hardware\App_Flash.c</FilePath>
-            </File>
-            <File>
-              <FileName>wdg_ecat.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\Hardware\wdg_ecat.c</FilePath>
             </File>
           </Files>
         </Group>
