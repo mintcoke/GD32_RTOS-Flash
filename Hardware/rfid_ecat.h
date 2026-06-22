@@ -225,8 +225,9 @@ extern uint8_t g_RfidEpc   [RFID_ANT_COUNT][RFID_EPC_BYTES]; /* 每个天线的 
  * 软件看门狗 — 监控 RFID 模块是否响应
  *
  * 工作原理：
- *   g_RfidLastAliveMs 记录最后一次成功通信的时间戳，
- *   如果 (当前时间 - 最后存活时间) > 2s，触发软重置。
+ *   g_RfidLastAliveMs 记录最后一次收到模块响应（完整帧）的时间戳，
+ *   只要模块回了话（含"无标签"错误码）即视为活着；
+ *   如果 (当前时间 - 最后存活时间) > 2s（模块完全无响应），触发软重置。
  *
  * 重置流程：
  *   1. 设置 g_RfidWdTriggered = 1（防止重入）

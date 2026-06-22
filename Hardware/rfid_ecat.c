@@ -425,12 +425,26 @@ static void rfid_send_cmd_data(uint8_t cmd_id, const uint8_t *data, uint16_t len
  *
  * 返回值：0=等待中, >0=帧长度, <0=错误
  * 在主循环或阻塞等待函数中调用。
+ *
+ * 看门狗时间戳更新策略：
+ *   只要收到完整有效帧（r > 0），就刷新 g_RfidLastAliveMs。
+ *   因为"模块回了话"（哪怕是"无标签"错误码 0x15/0xF5）都说明
+ *   串口与模块固件正常工作；只有真超时（模块完全不回话）才不刷新，
+ *   由 RFID_WatchdogCheck 在 2s 后判定卡死并触发复位。
+ *   这样无标签场景下看门狗不会每 2 秒误触发一次硬复位。
  * ============================================================ */
 int rfid_poll(void)
 {
+    int r;
+
     rfid_clear_usart_errors();
     rfid_rx_dma_service();       /* 从 DMA 缓冲区拷贝新数据 */
-    return rfid_frame_status();  /* 检查帧完整性 */
+    r = rfid_frame_status();     /* 检查帧完整性 */
+    if (r > 0) {
+        extern volatile uint32_t g_SysTickCnt;
+        g_RfidLastAliveMs = g_SysTickCnt;  /* 收到完整帧 → 模块活着 */
+    }
+    return r;
 }
 
 /* ============================================================
