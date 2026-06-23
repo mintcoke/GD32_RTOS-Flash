@@ -380,10 +380,10 @@ uint8_t RFID_EcatCmdTask(void)
     switch (cmd) {
 
     case RFID_PLC_CMD_GET_INFO:
-        if (addr > 1U) {
-            addr = 1U;
+        if (words > 1U) {
+            words = 1U;
         }
-        ret = RFID_PlcCommandU8(RFID_CMD_READ_INFO, (uint8_t)addr, buf);
+        ret = RFID_PlcCommandU8(RFID_CMD_READ_INFO, (uint8_t)words, buf);
         break;
 
     case RFID_PLC_CMD_READ_TID:
@@ -516,10 +516,10 @@ uint8_t RFID_EcatCmdTask(void)
         break;
 
     case RFID_PLC_CMD_SET_REGION:
-        if (addr > 0xFFU) {
+        if (words > 0xFFU) {
             ret = RFID_RET_FRAME_ERR;
         } else {
-            uint8_t region = (uint8_t)addr;
+            uint8_t region = (uint8_t)words;
             ret = RFID_PlcCommandStatusU8(RFID_CMD_SET_REGION, region, buf);
             if (ret == RFID_RET_OK) {
                 RFID_WriteU16BE(buf, (uint16_t)region);
@@ -533,10 +533,10 @@ uint8_t RFID_EcatCmdTask(void)
         break;
 
     case RFID_PLC_CMD_SET_CHANNEL:
-        if (addr > 0xFFU) {
+        if (words > 0xFFU) {
             ret = RFID_RET_FRAME_ERR;
         } else {
-            uint8_t ch = (uint8_t)addr;
+            uint8_t ch = (uint8_t)words;
             ret = RFID_PlcCommandStatusU8(RFID_CMD_SET_CHANNEL, ch, buf);
             if (ret == RFID_RET_OK) {
                 RFID_WriteU16BE(buf, (uint16_t)ch);
@@ -551,7 +551,7 @@ uint8_t RFID_EcatCmdTask(void)
 
     case RFID_PLC_CMD_SET_HOP:
         {
-            uint8_t hop = (addr == 0U) ? 0x00U : 0xFFU;
+            uint8_t hop = (words == 0U) ? 0x00U : 0xFFU;
             ret = RFID_PlcCommandStatusU8(RFID_CMD_SET_HOP, hop, buf);
             if (ret == RFID_RET_OK) {
                 RFID_WriteU16BE(buf, (uint16_t)hop);
@@ -565,10 +565,10 @@ uint8_t RFID_EcatCmdTask(void)
         break;
 
     case RFID_PLC_CMD_SET_MODE:
-        if (addr > 1U) {
+        if (words > 1U) {
             ret = RFID_RET_FRAME_ERR;
         } else {
-            uint8_t mode = (uint8_t)addr;
+            uint8_t mode = (uint8_t)words;
             ret = RFID_PlcCommandStatusU8(RFID_CMD_SET_MODE, mode, buf);
             if (ret == RFID_RET_OK) {
                 RFID_WriteU16BE(buf, (uint16_t)mode);
@@ -639,7 +639,7 @@ uint8_t RFID_EcatCmdTask(void)
 
     case RFID_PLC_CMD_SET_CARRIER:
         {
-            uint8_t carrier = (addr == 0U) ? 0x00U : 0xFFU;
+            uint8_t carrier = (words == 0U) ? 0x00U : 0xFFU;
             ret = RFID_PlcCommandStatusU8(RFID_CMD_SET_CARRIER, carrier, buf);
             if (ret == RFID_RET_OK) {
                 RFID_WriteU16BE(buf, (uint16_t)carrier);

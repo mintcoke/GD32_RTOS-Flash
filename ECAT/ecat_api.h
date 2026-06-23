@@ -69,43 +69,45 @@ extern "C" {
 
 #define RX_RFID_CMD      0   /* 命令码: 0=空闲, 1..31=PLC命令, 100=原始命令 */
 #define RX_RFID_ANT      1   /* 天线: 1/2/3, 0=保持当前 */
-#define RX_RFID_ADDR     2   /* 字地址或命令参数 */
-#define RX_RFID_WORDS    3   /* 读写字数或命令参数 */
+#define RX_RFID_ADDR     2   /* 起始字地址(仅读写类命令用) */
+#define RX_RFID_WORDS    3   /* 读写字数(读写类) 或 参数值(参数类命令) */
 #define RX_RFID_DATA     4   /* 写入数据, 64 字 = 128 字节 */
 
 /* ---- PLC 命令码 — 写 DO(0) 触发，边沿触发(见 Application.c 文件头) ---- */
 
+/* 字段用法: ADDR=起始字地址(仅读写类), WORDS=字数(读写类)或参数值(参数类)
+ * 读写类(ADDR+WORDS): READ_TID/USER/RFU, WRITE_USER/EPC, RAW
+ * 参数类(仅 WORDS): 其他 SET/GET/INVENTORY 等, ADDR 不用保持 0 */
 #define RFID_PLC_CMD_NONE           0
-#define RFID_PLC_CMD_GET_INFO       1   /* 读模块信息(固件版本) */
-#define RFID_PLC_CMD_READ_TID       2   /* 读 TID 区 */
-#define RFID_PLC_CMD_READ_USER      3   /* 读用户区 */
-#define RFID_PLC_CMD_WRITE_USER     4   /* 写用户区 */
-#define RFID_PLC_CMD_WRITE_EPC      5   /* 写 EPC 区(自动选标签)。addr>=2，前两字 PC/CRC 禁写；
-                                         * 总分段<=31字(标准上限)，单段<=15字(模块限制) */
-#define RFID_PLC_CMD_SET_EPC_LEN    6   /* 改 EPC 长度(改 PC 字) */
-#define RFID_PLC_CMD_SET_POWER      7
+#define RFID_PLC_CMD_GET_INFO       1   /* WORDS=子参数(0/1) */
+#define RFID_PLC_CMD_READ_TID       2   /* ADDR+WORDS */
+#define RFID_PLC_CMD_READ_USER      3   /* ADDR+WORDS */
+#define RFID_PLC_CMD_WRITE_USER     4   /* ADDR+WORDS, DATA=写入数据 */
+#define RFID_PLC_CMD_WRITE_EPC      5   /* ADDR+WORDS(ADDR>=2,前两字PC/CRC禁写), DATA=写入数据 */
+#define RFID_PLC_CMD_SET_EPC_LEN    6   /* WORDS=EPC长度(字数,1~31) */
+#define RFID_PLC_CMD_SET_POWER      7   /* WORDS=功率(1~33=dBm, >33=内部单位) */
 #define RFID_PLC_CMD_GET_POWER      8
-#define RFID_PLC_CMD_SET_REGION     9
+#define RFID_PLC_CMD_SET_REGION     9   /* WORDS=区域码 */
 #define RFID_PLC_CMD_GET_REGION     10
-#define RFID_PLC_CMD_SET_CHANNEL    11
+#define RFID_PLC_CMD_SET_CHANNEL    11  /* WORDS=信道码 */
 #define RFID_PLC_CMD_GET_CHANNEL    12
-#define RFID_PLC_CMD_SET_HOP        13  /* 0=关, 非0=开 */
+#define RFID_PLC_CMD_SET_HOP        13  /* WORDS=0关/非0开 */
 #define RFID_PLC_CMD_GET_HOP        14
-#define RFID_PLC_CMD_SET_MODE       15  /* 0=密集读取, 1=正常 */
+#define RFID_PLC_CMD_SET_MODE       15  /* WORDS=0密集/1正常 */
 #define RFID_PLC_CMD_GET_MODE       16
-#define RFID_PLC_CMD_INVENTORY      17  /* 单次盘点(返回 RSSI+PC+EPC) */
+#define RFID_PLC_CMD_INVENTORY      17  /* 无参数, 返回 RSSI+PC+EPC */
 #define RFID_PLC_CMD_STOP_POLL      18
-#define RFID_PLC_CMD_SET_CH_LIST    19
+#define RFID_PLC_CMD_SET_CH_LIST    19  /* WORDS=信道数, DATA=信道列表 */
 #define RFID_PLC_CMD_GET_CH_LIST    20
-#define RFID_PLC_CMD_SET_RX         21
+#define RFID_PLC_CMD_SET_RX         21  /* DATA=4字节灵敏度参数 */
 #define RFID_PLC_CMD_GET_RX         22
 #define RFID_PLC_CMD_TEST_RSSI      23
-#define RFID_PLC_CMD_SET_CARRIER    24  /* 0=关, 非0=开 */
+#define RFID_PLC_CMD_SET_CARRIER    24  /* WORDS=0关/非0开 */
 #define RFID_PLC_CMD_RESET          25  /* 软重置 RFID 模块 */
-#define RFID_PLC_CMD_SELECT_EPC     30  /* 选择指定 EPC 标签 */
+#define RFID_PLC_CMD_SELECT_EPC     30  /* WORDS=EPC字数, DATA=EPC码 */
 #define RFID_PLC_CMD_CLEAR_SELECT   31
-#define RFID_PLC_CMD_READ_RFU       32  /* 读 RFU 区(密码)，最多 4 字，写禁止 */
-#define RFID_PLC_CMD_RAW            100 /* 原始命令直发模块 */
+#define RFID_PLC_CMD_READ_RFU       32  /* ADDR+WORDS(最多4字), 写禁止 */
+#define RFID_PLC_CMD_RAW            100 /* ADDR=模块命令码, WORDS=数据字节数, DATA=数据 */
 
 /* 命令状态码 — DI(TX_RFID_CMD_STATUS) */
 #define RFID_PLC_STATUS_IDLE    0

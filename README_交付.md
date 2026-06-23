@@ -169,13 +169,18 @@
 ### 5.1 发命令（PLC → 从站，写 RxPDO）
 
 ```
-DO(0)=CMD   DO(1)=ANT   DO(2)=ADDR   DO(3)=WORDS   DO(4..33)=DATA
+DO(0)=CMD   DO(1)=ANT   DO(2)=ADDR   DO(3)=WORDS   DO(4..67)=DATA
 ```
+
+字段用法（统一规则）：
+- **ADDR**（DO(2)）：起始字地址，**仅读写类命令用**（READ/WRITE/RAW），其他命令不用保持 0
+- **WORDS**（DO(3)）：读写字数（读写类）或参数值（参数类命令）
+- **DATA**（DO(4..67)）：写入数据，64 字 = 128 字节
 
 ### 5.2 收结果（从站 → PLC，读 TxPDO）
 
 ```
-DI(103)=ECHO  DI(104)=STATUS  DI(105)=RESULT  DI(106)=LEN  DI(107..138)=DATA
+DI(103)=ECHO  DI(104)=STATUS  DI(105)=RESULT  DI(106)=LEN  DI(107..170)=DATA
 ```
 
 STATUS：0=IDLE / 1=BUSY / **2=OK** / 3=ERROR（注意 2 才是成功，别和习惯混淆）
