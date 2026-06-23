@@ -604,6 +604,11 @@ int RFID_WriteTag(uint8_t bank, uint16_t addr, uint16_t len_words, const uint8_t
         rfid_last_result = RFID_RET_FRAME_ERR;
         return RFID_RET_FRAME_ERR;
     }
+    /* RFU 区(Bank 0)写禁止 — 含 Kill/Access 密码，误写可能报废标签 */
+    if (bank == RFID_BANK_RFU) {
+        rfid_last_result = RFID_RET_FRAME_ERR;
+        return RFID_RET_FRAME_ERR;
+    }
 
     data_bytes = (uint16_t)(len_words * 2U);
     payload[0] = 0;

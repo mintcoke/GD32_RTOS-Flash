@@ -80,7 +80,8 @@ extern "C" {
 #define RFID_PLC_CMD_READ_TID       2   /* 读 TID 区 */
 #define RFID_PLC_CMD_READ_USER      3   /* 读用户区 */
 #define RFID_PLC_CMD_WRITE_USER     4   /* 写用户区 */
-#define RFID_PLC_CMD_WRITE_EPC      5   /* 写 EPC 区(自动选标签)。addr>=2，前两字 PC/CRC 禁写；单次<=15字 */
+#define RFID_PLC_CMD_WRITE_EPC      5   /* 写 EPC 区(自动选标签)。addr>=2，前两字 PC/CRC 禁写；
+                                         * 总分段<=31字(标准上限)，单段<=15字(模块限制) */
 #define RFID_PLC_CMD_SET_EPC_LEN    6   /* 改 EPC 长度(改 PC 字) */
 #define RFID_PLC_CMD_SET_POWER      7
 #define RFID_PLC_CMD_GET_POWER      8
@@ -103,6 +104,7 @@ extern "C" {
 #define RFID_PLC_CMD_RESET          25  /* 软重置 RFID 模块 */
 #define RFID_PLC_CMD_SELECT_EPC     30  /* 选择指定 EPC 标签 */
 #define RFID_PLC_CMD_CLEAR_SELECT   31
+#define RFID_PLC_CMD_READ_RFU       32  /* 读 RFU 区(密码)，最多 4 字，写禁止 */
 #define RFID_PLC_CMD_RAW            100 /* 原始命令直发模块 */
 
 /* 命令状态码 — DI(TX_RFID_CMD_STATUS) */

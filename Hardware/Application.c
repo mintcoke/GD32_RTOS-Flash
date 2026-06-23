@@ -37,6 +37,15 @@
 #define RFID_REQ_DATA_BYTES  (RFID_REQ_DATA_WORDS * 2)
 #define RFID_WRITE_MAX_WORDS 15U /* RFID 模块单次写最大字数 (15字=30字节) */
 
+/* 各存储区读写上限(字)。标准上限放行，越界写由标签返回错误码如实上报。
+ * RFU: 标准固定 64 位=4 字，写禁止。
+ * EPC: 标准上限 31 字(PC 5 位编码)，前两字 PC/CRC 禁写。
+ * TID/USER: 标准未限定，固件按 31 字限(缓冲区 RFID_RX_BUF_SIZE=256 字节够用)。 */
+#define RFID_RFU_MAX_WORDS     4U
+#define RFID_EPC_MAX_WORDS     31U
+#define RFID_TID_MAX_WORDS     31U
+#define RFID_USER_MAX_WORDS    31U
+
 /* EPC 区布局: [PC(1word,addr=1)][CRC(1word)][EPC数据(addr>=2)] */
 #define RFID_EPC_PC_ADDR     1U
 #define RFID_EPC_DATA_ADDR   2U
@@ -401,12 +410,13 @@ uint8_t RFID_EcatCmdTask(void)
         if (words == 0U) {
             words = 6U;
         }
-        if (words > (uint16_t)(RFID_CMD_DATA_BYTES / 2U)) {
-            words = (uint16_t)(RFID_CMD_DATA_BYTES / 2U);
-        }
-        ret = RFID_ReadTag(RFID_BANK_TID, addr, words, buf);
-        if (ret == RFID_RET_OK) {
-            RFID_WriteCmdDataToPdo(buf, (uint16_t)(words * 2U));
+        if (words > RFID_TID_MAX_WORDS) {
+            ret = RFID_RET_FRAME_ERR;
+        } else {
+            ret = RFID_ReadTag(RFID_BANK_TID, addr, words, buf);
+            if (ret == RFID_RET_OK) {
+                RFID_WriteCmdDataToPdo(buf, (uint16_t)(words * 2U));
+            }
         }
         break;
 
@@ -414,12 +424,24 @@ uint8_t RFID_EcatCmdTask(void)
         if (words == 0U) {
             words = 6U;
         }
-        if (words > (uint16_t)(RFID_CMD_DATA_BYTES / 2U)) {
-            words = (uint16_t)(RFID_CMD_DATA_BYTES / 2U);
+        if (words > RFID_USER_MAX_WORDS) {
+            ret = RFID_RET_FRAME_ERR;
+        } else {
+            ret = RFID_PlcEnsureSelected((uint8_t)ant, buf);
+            if (ret == RFID_RET_OK) {
+                ret = RFID_ReadTag(RFID_BANK_USER, addr, words, buf);
+                if (ret == RFID_RET_OK) {
+                    RFID_WriteCmdDataToPdo(buf, (uint16_t)(words * 2U));
+                }
+            }
         }
-        ret = RFID_PlcEnsureSelected((uint8_t)ant, buf);
-        if (ret == RFID_RET_OK) {
-            ret = RFID_ReadTag(RFID_BANK_USER, addr, words, buf);
+        break;
+
+    case RFID_PLC_CMD_READ_RFU:     /* 读 RFU 区(密码)，最多 4 字，写禁止 */
+        if (words == 0U || words > RFID_RFU_MAX_WORDS || addr >= RFID_RFU_MAX_WORDS) {
+            ret = RFID_RET_FRAME_ERR;
+        } else {
+            ret = RFID_ReadTag(RFID_BANK_RFU, addr, words, buf);
             if (ret == RFID_RET_OK) {
                 RFID_WriteCmdDataToPdo(buf, (uint16_t)(words * 2U));
             }
@@ -451,9 +473,12 @@ uint8_t RFID_EcatCmdTask(void)
         break;
 
     case RFID_PLC_CMD_WRITE_EPC:
-        /* EPC 区前两字为 PC/CRC 禁止写，addr 必须 >= 2。单次最多 15 字。 */
-        if (words == 0U || words > RFID_WRITE_MAX_WORDS
-            || addr < RFID_EPC_DATA_ADDR) {
+        /* EPC 区前两字 PC/CRC 禁写，addr>=2。总分段<=31字(标准上限)，单段<=15字(模块限制)。
+         * 单次命令受 RxPDO 数据区 30 字限制(words<=30)，写 31 字需发两次命令。
+         * 越界(addr+words>33)报错，标签容量不足由标签返回错误码如实上报。 */
+        if (words == 0U || words > RFID_REQ_DATA_WORDS
+            || addr < RFID_EPC_DATA_ADDR
+            || (uint16_t)(addr + words) > (RFID_EPC_DATA_ADDR + RFID_EPC_MAX_WORDS)) {
             ret = RFID_RET_FRAME_ERR;
         } else {
             uint8_t write_buf[RFID_REQ_DATA_BYTES];
@@ -463,7 +488,7 @@ uint8_t RFID_EcatCmdTask(void)
             if (ret == RFID_RET_OK) {
                 RFID_UnpackPdoBytes(RX_RFID_DATA, write_bytes, write_buf);
                 RFID_WriteCmdDataToPdo(write_buf, write_bytes);
-                ret = RFID_WriteTag(RFID_BANK_EPC, actual_addr, words, write_buf);
+                ret = RFID_WriteTagChunked(RFID_BANK_EPC, actual_addr, words, write_buf);
                 if (ret == RFID_RET_OK) {
                     RFID_UpdateEpcCacheFromWrite((uint8_t)ant, actual_addr, write_buf, write_bytes);
                     if (ant >= 1U && ant <= RFID_ANT_COUNT && g_RfidEpcLen[ant - 1U] > 0U) {
@@ -477,8 +502,8 @@ uint8_t RFID_EcatCmdTask(void)
         }
         break;
 
-    case RFID_PLC_CMD_SET_EPC_LEN:    /* 改 EPC 长度 = 改 PC 字高 5 位 */
-        if (words == 0U || words > RFID_WRITE_MAX_WORDS) {
+    case RFID_PLC_CMD_SET_EPC_LEN:    /* 改 EPC 长度 = 改 PC 字高 5 位，1~31 字 */
+        if (words == 0U || words > RFID_EPC_MAX_WORDS) {
             ret = RFID_RET_FRAME_ERR;
         } else {
             ret = RFID_PlcEnsureSelected((uint8_t)ant, buf);
