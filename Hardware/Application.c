@@ -31,8 +31,8 @@
 #define RFID_PDO_EPC         3   /* EPC 数据起始 (31 个 UINT16) */
 
 #define RFID_ANT_SETTLE_MS   5U  /* 天线切换稳定时间 */
-#define RFID_CMD_DATA_WORDS  32  /* 命令响应最大字数 (64 字节) */
-#define RFID_REQ_DATA_WORDS  30  /* 请求数据最大字数 (60 字节) */
+#define RFID_CMD_DATA_WORDS  64  /* 命令响应最大字数 (128 字节, 受 TxPDO 数据区限制) */
+#define RFID_REQ_DATA_WORDS  64  /* 请求数据最大字数 (128 字节, 受 RxPDO 数据区限制) */
 #define RFID_CMD_DATA_BYTES  (RFID_CMD_DATA_WORDS * 2)
 #define RFID_REQ_DATA_BYTES  (RFID_REQ_DATA_WORDS * 2)
 #define RFID_WRITE_MAX_WORDS 15U /* RFID 模块单次写最大字数 (15字=30字节) */
@@ -40,11 +40,11 @@
 /* 各存储区读写上限(字)。标准上限放行，越界写由标签返回错误码如实上报。
  * RFU: 标准固定 64 位=4 字，写禁止。
  * EPC: 标准上限 31 字(PC 5 位编码)，前两字 PC/CRC 禁写。
- * TID/USER: 标准未限定，固件按 31 字限(缓冲区 RFID_RX_BUF_SIZE=256 字节够用)。 */
+ * TID/USER: 标准未限定，固件按 PDO 数据区 64 字限(单次命令传输上限)。 */
 #define RFID_RFU_MAX_WORDS     4U
 #define RFID_EPC_MAX_WORDS     31U
-#define RFID_TID_MAX_WORDS     31U
-#define RFID_USER_MAX_WORDS    31U
+#define RFID_TID_MAX_WORDS     64U
+#define RFID_USER_MAX_WORDS    64U
 
 /* EPC 区布局: [PC(1word,addr=1)][CRC(1word)][EPC数据(addr>=2)] */
 #define RFID_EPC_PC_ADDR     1U
@@ -449,7 +449,7 @@ uint8_t RFID_EcatCmdTask(void)
         break;
 
     case RFID_PLC_CMD_WRITE_USER:
-        if (words == 0U || words > (uint16_t)(RFID_REQ_DATA_BYTES / 2U)) {
+        if (words == 0U || words > RFID_USER_MAX_WORDS) {
             ret = RFID_RET_FRAME_ERR;
         } else {
             uint16_t write_bytes = (uint16_t)(words * 2U);

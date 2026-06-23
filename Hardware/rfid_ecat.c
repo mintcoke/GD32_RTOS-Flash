@@ -593,14 +593,14 @@ int RFID_ReadTag(uint8_t bank, uint16_t addr, uint16_t len_words, uint8_t *data)
  * 响应: [DataLen][Status(1B, 0=成功)][CS] */
 int RFID_WriteTag(uint8_t bank, uint16_t addr, uint16_t len_words, const uint8_t *data)
 {
-    uint8_t payload[9 + RFID_EPC_MAX_LEN];
+    uint8_t payload[9 + RFID_TAG_MAX_WORDS * 2U];
     uint16_t data_bytes;
     uint16_t rsp_len;
     uint16_t status_idx;
     int r;
 
     if (data == NULL || bank > RFID_BANK_USER || len_words == 0U ||
-        len_words > (uint16_t)(RFID_EPC_MAX_LEN / 2U)) {
+        len_words > RFID_TAG_MAX_WORDS) {
         rfid_last_result = RFID_RET_FRAME_ERR;
         return RFID_RET_FRAME_ERR;
     }
