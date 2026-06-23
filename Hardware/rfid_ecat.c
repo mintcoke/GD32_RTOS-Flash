@@ -637,7 +637,7 @@ int RFID_WriteTag(uint8_t bank, uint16_t addr, uint16_t len_words, const uint8_t
         rfid_last_result = RFID_RET_MODULE_ERR;
         return RFID_RET_MODULE_ERR;
     }
-    if (rfid_rx_buf[2] != RFID_CMD_WRITE_TAG || r < 9) {
+    if (rfid_rx_buf[2] != RFID_CMD_WRITE_TAG || r < 8) {
         rfid_last_result = RFID_RET_FRAME_ERR;
         return RFID_RET_FRAME_ERR;
     }

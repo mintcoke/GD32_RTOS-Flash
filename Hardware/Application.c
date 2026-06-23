@@ -35,7 +35,6 @@
 #define RFID_REQ_DATA_WORDS  64  /* 请求数据最大字数 (128 字节, 受 RxPDO 数据区限制) */
 #define RFID_CMD_DATA_BYTES  (RFID_CMD_DATA_WORDS * 2)
 #define RFID_REQ_DATA_BYTES  (RFID_REQ_DATA_WORDS * 2)
-#define RFID_WRITE_MAX_WORDS 15U /* RFID 模块单次写最大字数 (15字=30字节) */
 
 /* 各存储区读写上限(字)。标准上限放行，越界写由标签返回错误码如实上报。
  * RFU: 标准固定 64 位=4 字，写禁止。
@@ -295,29 +294,10 @@ static int RFID_PlcEnsureSelected(uint8_t ant, uint8_t *buf)
     return RFID_PlcSelectEpcBytes(g_RfidEpc[idx], g_RfidEpcLen[idx], buf);
 }
 
-/* 分段写：RFID 模块写命令(0x49)单次最多 15 words，超出自动拆段。 */
+/* 写标签：words 多少直接单次写多少，模块拒写由 RFID_WriteTag 如实返回错误码。 */
 static int RFID_WriteTagChunked(uint8_t bank, uint16_t addr, uint16_t words, const uint8_t *data)
 {
-    uint16_t offset_words = 0U;
-
-    while (offset_words < words) {
-        uint16_t chunk = (uint16_t)(words - offset_words);
-        uint16_t chunk_addr = (uint16_t)(addr + offset_words);
-        int ret;
-
-        if (chunk > RFID_WRITE_MAX_WORDS) {
-            chunk = RFID_WRITE_MAX_WORDS;
-        }
-
-        ret = RFID_WriteTag(bank, chunk_addr, chunk, &data[offset_words * 2U]);
-        if (ret != RFID_RET_OK) {
-            return ret;
-        }
-
-        offset_words = (uint16_t)(offset_words + chunk);
-    }
-
-    return RFID_RET_OK;
+    return RFID_WriteTag(bank, addr, words, data);
 }
 
 /* 阻塞延时(天线切换稳定)。用 ECAT_KeepAlive 保活。 */
@@ -473,9 +453,9 @@ uint8_t RFID_EcatCmdTask(void)
         break;
 
     case RFID_PLC_CMD_WRITE_EPC:
-        /* EPC 区前两字 PC/CRC 禁写，addr>=2。总分段<=31字(标准上限)，单段<=15字(模块限制)。
-         * 单次命令受 RxPDO 数据区 30 字限制(words<=30)，写 31 字需发两次命令。
-         * 越界(addr+words>33)报错，标签容量不足由标签返回错误码如实上报。 */
+        /* EPC 区前两字 PC/CRC 禁写，addr>=2。总分段<=31字(标准上限 PC 5 位编码)。
+         * 单次命令受 RxPDO 数据区 64 字限制。越界(addr+words>33)报错，
+         * 标签容量不足由标签返回错误码如实上报。 */
         if (words == 0U || words > RFID_REQ_DATA_WORDS
             || addr < RFID_EPC_DATA_ADDR
             || (uint16_t)(addr + words) > (RFID_EPC_DATA_ADDR + RFID_EPC_MAX_WORDS)) {
