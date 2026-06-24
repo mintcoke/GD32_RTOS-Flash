@@ -74,7 +74,7 @@
 #define RFID_CMD_GET_POWER    0xB7
 #define RFID_CMD_SET_RX       0xF0
 #define RFID_CMD_GET_RX       0xF1
-#define RFID_CMD_TEST_RSSI    0xF3
+#define RFID_CMD_TEST_RSSI    0xF2   /* 测试射频输入端 RSSI (0xF2, 本模块不支持 0xF3) */
 #define RFID_CMD_SET_MODE     0xF5   /* 0=密集, 1=正常 */
 #define RFID_CMD_GET_MODE     0xF6
 

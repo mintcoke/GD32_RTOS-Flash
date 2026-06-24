@@ -480,14 +480,14 @@ uint8_t RFID_EcatCmdTask(void)
     /* ---- 命令分发 ---- */
     switch (cmd) {
 
-    case RFID_PLC_CMD_GET_INFO:
+    case RFID_PLC_CMD_GET_INFO:        /* 读模块信息(硬件/固件版本), WORDS=0硬件/1固件 */
         if (words > 1U) {
             words = 1U;
         }
         ret = RFID_PlcCommandU8(RFID_CMD_READ_INFO, (uint8_t)words, buf);
         break;
 
-    case RFID_PLC_CMD_READ_TID:
+    case RFID_PLC_CMD_READ_TID:        /* 读 TID 区(只读), 默认 6 字, 最多 122 字 */
         if (words == 0U) {
             words = 6U;
         }
@@ -501,7 +501,7 @@ uint8_t RFID_EcatCmdTask(void)
         }
         break;
 
-    case RFID_PLC_CMD_READ_USER:
+    case RFID_PLC_CMD_READ_USER:       /* 读 USER 区(自动选标签), 默认 6 字, 最多 122 字 */
         if (words == 0U) {
             words = 6U;
         }
@@ -537,7 +537,7 @@ uint8_t RFID_EcatCmdTask(void)
         }
         break;
 
-    case RFID_PLC_CMD_WRITE_USER:
+    case RFID_PLC_CMD_WRITE_USER:      /* 写 USER 区(自动选标签+写后回读校验) */
         if (words == 0U || words > RFID_USER_MAX_WORDS) {
             ret = RFID_RET_FRAME_ERR;
         } else {
@@ -609,7 +609,7 @@ uint8_t RFID_EcatCmdTask(void)
         }
         break;
 
-    case RFID_PLC_CMD_SET_POWER:
+    case RFID_PLC_CMD_SET_POWER:       /* 设置发射功率, WORDS=1~33 dBm 或 >33 原始值 */
         {
             uint16_t pwr = RFID_PlcPowerParam(words);
             ret = RFID_PlcCommandStatusU16(RFID_CMD_SET_POWER, pwr, buf);
@@ -620,11 +620,11 @@ uint8_t RFID_EcatCmdTask(void)
         }
         break;
 
-    case RFID_PLC_CMD_GET_POWER:
+    case RFID_PLC_CMD_GET_POWER:       /* 读取发射功率 */
         ret = RFID_PlcCommandNoParam(RFID_CMD_GET_POWER, buf);
         break;
 
-    case RFID_PLC_CMD_SET_REGION:
+    case RFID_PLC_CMD_SET_REGION:      /* 设置工作区域, WORDS=区域编码 */
         if (words > 0xFFU) {
             ret = RFID_RET_FRAME_ERR;
         } else {
@@ -637,11 +637,11 @@ uint8_t RFID_EcatCmdTask(void)
         }
         break;
 
-    case RFID_PLC_CMD_GET_REGION:
+    case RFID_PLC_CMD_GET_REGION:      /* 读取工作区域 */
         ret = RFID_PlcCommandNoParam(RFID_CMD_GET_REGION, buf);
         break;
 
-    case RFID_PLC_CMD_SET_CHANNEL:
+    case RFID_PLC_CMD_SET_CHANNEL:     /* 设置固定信道, WORDS=信道号 */
         if (words > 0xFFU) {
             ret = RFID_RET_FRAME_ERR;
         } else {
@@ -654,11 +654,11 @@ uint8_t RFID_EcatCmdTask(void)
         }
         break;
 
-    case RFID_PLC_CMD_GET_CHANNEL:
+    case RFID_PLC_CMD_GET_CHANNEL:     /* 读取当前信道 */
         ret = RFID_PlcCommandNoParam(RFID_CMD_GET_CHANNEL, buf);
         break;
 
-    case RFID_PLC_CMD_SET_HOP:
+    case RFID_PLC_CMD_SET_HOP:         /* 设置跳频模式, WORDS=0关/非0开 */
         {
             uint8_t hop = (words == 0U) ? 0x00U : 0xFFU;
             ret = RFID_PlcCommandStatusU8(RFID_CMD_SET_HOP, hop, buf);
@@ -669,11 +669,11 @@ uint8_t RFID_EcatCmdTask(void)
         }
         break;
 
-    case RFID_PLC_CMD_GET_HOP:
+    case RFID_PLC_CMD_GET_HOP:         /* 读取跳频模式 */
         ret = RFID_PlcCommandNoParam(RFID_CMD_GET_HOP, buf);
         break;
 
-    case RFID_PLC_CMD_SET_MODE:
+    case RFID_PLC_CMD_SET_MODE:        /* 设置工作模式, WORDS=0正常/1密集 */
         if (words > 1U) {
             ret = RFID_RET_FRAME_ERR;
         } else {
@@ -686,11 +686,11 @@ uint8_t RFID_EcatCmdTask(void)
         }
         break;
 
-    case RFID_PLC_CMD_GET_MODE:
+    case RFID_PLC_CMD_GET_MODE:        /* 读取工作模式 */
         ret = RFID_PlcCommandNoParam(RFID_CMD_GET_MODE, buf);
         break;
 
-    case RFID_PLC_CMD_INVENTORY:
+    case RFID_PLC_CMD_INVENTORY:       /* 单次盘点, 返回 RSSI+PC+EPC */
         {
             rfid_tag_t tag;
             ret = RFID_Inventory(&tag);
@@ -704,11 +704,11 @@ uint8_t RFID_EcatCmdTask(void)
         }
         break;
 
-    case RFID_PLC_CMD_STOP_POLL:
+    case RFID_PLC_CMD_STOP_POLL:       /* 停止连续盘点 */
         ret = RFID_PlcCommandStatusOnly(RFID_CMD_STOP_POLL, NULL, 0U, buf);
         break;
 
-    case RFID_PLC_CMD_SET_CH_LIST:
+    case RFID_PLC_CMD_SET_CH_LIST:     /* 设置跳频信道列表, WORDS=数量+WRITE_DATA=信道 */
         if (words > RFID_REQ_DATA_BYTES) {
             ret = RFID_RET_FRAME_ERR;
         } else {
@@ -723,11 +723,11 @@ uint8_t RFID_EcatCmdTask(void)
         }
         break;
 
-    case RFID_PLC_CMD_GET_CH_LIST:
+    case RFID_PLC_CMD_GET_CH_LIST:     /* 读取跳频信道列表 */
         ret = RFID_PlcCommandNoParam(RFID_CMD_GET_CH_LIST, buf);
         break;
 
-    case RFID_PLC_CMD_SET_RX:
+    case RFID_PLC_CMD_SET_RX:          /* 设置接收灵敏度, WRITE_DATA=4字节参数 */
         {
             uint8_t rx_params[4];
             RFID_UnpackPdoBytes(RX_RFID_DATA, 4U, rx_params);
@@ -738,15 +738,15 @@ uint8_t RFID_EcatCmdTask(void)
         }
         break;
 
-    case RFID_PLC_CMD_GET_RX:
+    case RFID_PLC_CMD_GET_RX:          /* 读取接收灵敏度 */
         ret = RFID_PlcCommandNoParam(RFID_CMD_GET_RX, buf);
         break;
 
-    case RFID_PLC_CMD_TEST_RSSI:
+    case RFID_PLC_CMD_TEST_RSSI:       /* RSSI 测试 */
         ret = RFID_PlcCommandNoParam(RFID_CMD_TEST_RSSI, buf);
         break;
 
-    case RFID_PLC_CMD_SET_CARRIER:
+    case RFID_PLC_CMD_SET_CARRIER:     /* 载波开关, WORDS=0关/非0开 */
         {
             uint8_t carrier = (words == 0U) ? 0x00U : 0xFFU;
             ret = RFID_PlcCommandStatusU8(RFID_CMD_SET_CARRIER, carrier, buf);
@@ -757,12 +757,12 @@ uint8_t RFID_EcatCmdTask(void)
         }
         break;
 
-    case RFID_PLC_CMD_RESET:
+    case RFID_PLC_CMD_RESET:           /* 软重置 RFID 模块(非阻塞, 不等响应) */
         RFID_Reset();
         ret = RFID_RET_OK;
         break;
 
-    case RFID_PLC_CMD_SELECT_EPC:
+    case RFID_PLC_CMD_SELECT_EPC:      /* 选择指定 EPC 标签, WORDS=0用缓存/>0用WRITE_DATA */
         if (words == 0U) {
             words = (ant >= 1U && ant <= RFID_ANT_COUNT) ? g_RfidEpcLen[ant - 1U] : 0U;
             if (words > 0U) {
@@ -775,11 +775,11 @@ uint8_t RFID_EcatCmdTask(void)
         }
         break;
 
-    case RFID_PLC_CMD_CLEAR_SELECT:
+    case RFID_PLC_CMD_CLEAR_SELECT:   /* 清除标签选择 */
         ret = RFID_PlcCommandStatusU8(RFID_CMD_SET_SEL_MODE, RFID_SELECT_MODE_OFF, buf);
         break;
 
-    case RFID_PLC_CMD_RAW:            /* 原始命令直发模块 */
+    case RFID_PLC_CMD_RAW:            /* 原始命令直发模块, ADDR=指令码, WORDS=payload字节 */
         if (addr > 0xFFU || words > RFID_REQ_DATA_BYTES) {
             ret = RFID_RET_FRAME_ERR;
         } else {
@@ -790,7 +790,7 @@ uint8_t RFID_EcatCmdTask(void)
         }
         break;
 
-    default:
+    default:                           /* 未知命令码 */
         ret = RFID_RET_FRAME_ERR;
         break;
     }
