@@ -44,6 +44,7 @@
 #define RFID_EPC_MAX_WORDS     31U
 #define RFID_TID_MAX_WORDS     128U
 #define RFID_USER_MAX_WORDS    128U
+#define RFID_EPC_FIXED_WORDS   8U   /* READ_EPC_USER_ALL 每通道 EPC 固定读 8 字(不足补0, 超出截断), 保证每通道固定长度 */
 
 /* EPC 区布局: [PC(1word,addr=1)][CRC(1word)][EPC数据(addr>=2)] */
 #define RFID_EPC_PC_ADDR     1U
@@ -349,18 +350,25 @@ static int RFID_ReadEpcUserAll(uint16_t user_addr, uint16_t user_words, uint8_t 
         RFID_SetAntenna(ant);
         RFID_EcatDelayMs(RFID_ANT_SETTLE_MS);
 
-        /* --- 读 EPC: 先读 PC 字取长度, 再读 EPC 数据 --- */
-        if (RFID_ReadTag(RFID_BANK_EPC, RFID_EPC_PC_ADDR, 1U, epc_buf) == RFID_RET_OK) {
-            uint16_t pc = RFID_ReadU16BE(epc_buf);
-            epc_words = (uint16_t)((pc >> 11) & 0x1FU);
-            if (epc_words > 0U && epc_words <= RFID_EPC_MAX_WORDS) {
-                if (RFID_ReadTag(RFID_BANK_EPC, RFID_EPC_DATA_ADDR, epc_words, epc_buf) != RFID_RET_OK) {
-                    epc_status = (rfid_last_error != 0U) ? rfid_last_error : 0xFFU;
+        /* --- 读 EPC: 固定读 8 字, 失败填 0 (保证每通道固定长度好解析) --- */
+        {
+            uint8_t epc_len = RFID_EPC_FIXED_WORDS;
+            memset(epc_buf, 0, sizeof(epc_buf));
+            if (RFID_ReadTag(RFID_BANK_EPC, RFID_EPC_PC_ADDR, 1U, epc_buf) == RFID_RET_OK) {
+                uint16_t pc = RFID_ReadU16BE(epc_buf);
+                epc_words = (uint16_t)((pc >> 11) & 0x1FU);
+                if (epc_words == 0U || epc_words > RFID_EPC_MAX_WORDS) {
                     epc_words = 0;
                 }
+                memset(epc_buf, 0, epc_len * 2U);
+                if (epc_words > 0U) {
+                    if (RFID_ReadTag(RFID_BANK_EPC, RFID_EPC_DATA_ADDR, epc_words, epc_buf) != RFID_RET_OK) {
+                        epc_status = (rfid_last_error != 0U) ? rfid_last_error : 0xFFU;
+                    }
+                }
+            } else {
+                epc_status = (rfid_last_error != 0U) ? rfid_last_error : 0xFFU;
             }
-        } else {
-            epc_status = (rfid_last_error != 0U) ? rfid_last_error : 0xFFU;
         }
 
         /* --- 读 USER: 先选标签(用缓存 EPC), 再读 --- */
@@ -372,16 +380,25 @@ static int RFID_ReadEpcUserAll(uint16_t user_addr, uint16_t user_words, uint8_t 
             user_status = (rfid_last_error != 0U) ? rfid_last_error : 0xFFU;
         }
 
-        /* --- 写入 TxPDO: [EPC状态][EPC数据][USER状态][USER数据] --- */
+        /* --- 写入 TxPDO: [EPC状态][EPC 固定8字][USER状态][USER WORDS字] --- */
+        /* 每通道固定长度 = 1 + RFID_EPC_FIXED_WORDS + 1 + user_words, PLC 按固定偏移读 */
         /* EPC 状态字 */
         if (out_word < RFID_CMD_DATA_WORDS) {
             DI(TX_RFID_CMD_DATA + out_word) = epc_status;
             out_word++;
         }
-        /* EPC 数据(大端打包) */
-        for (uint16_t i = 0; i < epc_words && out_word < RFID_CMD_DATA_WORDS; i++) {
-            DI(TX_RFID_CMD_DATA + out_word) = RFID_PackBytes(epc_buf, (uint16_t)(epc_words * 2U), (uint16_t)(i * 2U));
-            out_word++;
+        /* EPC 数据(固定 RFID_EPC_FIXED_WORDS 字, 不足补 0) */
+        {
+            uint16_t copy_w = epc_words;
+            if (copy_w > RFID_EPC_FIXED_WORDS) {
+                copy_w = RFID_EPC_FIXED_WORDS;
+            }
+            for (uint16_t i = 0; i < RFID_EPC_FIXED_WORDS && out_word < RFID_CMD_DATA_WORDS; i++) {
+                DI(TX_RFID_CMD_DATA + out_word) = (i < copy_w)
+                    ? RFID_PackBytes(epc_buf, (uint16_t)(epc_words * 2U), (uint16_t)(i * 2U))
+                    : 0;
+                out_word++;
+            }
         }
         /* USER 状态字 */
         if (out_word < RFID_CMD_DATA_WORDS) {
@@ -485,7 +502,7 @@ uint8_t RFID_EcatCmdTask(void)
                     RFID_WriteCmdDataToPdo(buf, (uint16_t)(words * 2U));
                 }
             }
-        }
+        }READ_EPC_USER_ALL
         break;
 
     case RFID_PLC_CMD_READ_RFU:     /* 读 RFU 区(密码)，最多 4 字，写禁止 */
