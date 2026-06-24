@@ -420,18 +420,25 @@ static int RFID_ReadEpcUserAll(uint16_t user_addr, uint16_t user_words, uint8_t 
 
 /* PLC 命令分发核心。从 RxPDO 读命令执行，结果写 TxPDO。
  * 返回 1=处理中(主循环跳过 RFID_Scan), 0=无命令(继续 Scan)。
- * 边沿触发见文件头说明。 */
+ * 边沿触发见文件头说明。
+ *
+ * s_Armed 状态机(防重复执行):
+ *   - CMD 从 0 变非0 且 s_Armed=1 → 执行命令, s_Armed 置 0(锁定)
+ *   - CMD 保持非0 且 s_Armed=0   → 跳过(同一命令不重复执行)
+ *   - CMD 变回 0                  → s_Armed 置 1(重新武装, 准备下一条)
+ * 这样 PLC 每周期都发 RxPDO, 但同一命令只执行一次, 直到 PLC 清零 CMD。 */
 uint8_t RFID_EcatCmdTask(void)
 {
-    static uint8_t s_Armed = 1U;
+    static uint8_t s_Armed = 1U;   /* 1=等待新命令, 0=命令锁定中 */
     uint8_t buf[RFID_CMD_DATA_BYTES];
-    uint16_t cmd = DO(RX_RFID_CMD);
-    uint16_t ant = DO(RX_RFID_ANT);
-    uint16_t addr = DO(RX_RFID_ADDR);
-    uint16_t words = DO(RX_RFID_WORDS);
+    uint16_t cmd = DO(RX_RFID_CMD);       /* 读取命令码 */
+    uint16_t ant = DO(RX_RFID_ANT);       /* 读取天线号 */
+    uint16_t addr = DO(RX_RFID_ADDR);     /* 读取地址/参数 */
+    uint16_t words = DO(RX_RFID_WORDS);   /* 读取字数/参数 */
     int ret = RFID_RET_FRAME_ERR;
 
-    /* RFID 软复位进行中：不发阻塞命令，返回 BUSY 让主循环也跳过扫描 */
+    /* RFID 软复位进行中：模块正在重启, 不发任何阻塞命令, 返回 BUSY 让主循环也跳过扫描。
+     * 若此时 PLC 发了命令, 回显命令码并报 BUSY, 让 PLC 知道暂不可用。 */
     if (g_RfidWdTriggered != 0U) {
         if (cmd != RFID_PLC_CMD_NONE) {
             DI(TX_RFID_CMD_ECHO) = cmd;
@@ -441,6 +448,8 @@ uint8_t RFID_EcatCmdTask(void)
         return 1U;
     }
 
+    /* 无命令: 保持 IDLE 状态, 重新武装 s_Armed, 主循环继续做自动扫描。
+     * 注意: 若上条命令还在 BUSY(理论上不该出现), 不强行覆盖成 IDLE。 */
     if (cmd == RFID_PLC_CMD_NONE) {
         if (DI(TX_RFID_CMD_STATUS) != RFID_PLC_STATUS_BUSY) {
             DI(TX_RFID_CMD_STATUS) = RFID_PLC_STATUS_IDLE;
@@ -449,16 +458,20 @@ uint8_t RFID_EcatCmdTask(void)
         return 0U;
     }
 
+    /* 命令锁定中(s_Armed=0): CMD 还没被 PLC 清零, 同一命令不重复执行, 直接返回 */
     if (s_Armed == 0U) {
         return 0U;
     }
-    s_Armed = 0U;
+    s_Armed = 0U;   /* 锁定, 直到 CMD 清零才重新武装 */
 
+    /* 设置响应头: 回显命令码, 置 BUSY, 清结果码和数据区。
+     * PLC 据此知道命令已被接收, 轮询 STATUS 等待 OK/ERROR。 */
     DI(TX_RFID_CMD_ECHO) = cmd;
     DI(TX_RFID_CMD_STATUS) = RFID_PLC_STATUS_BUSY;
     DI(TX_RFID_CMD_RESULT) = 0;
     RFID_ClearCmdDataPdo();
 
+    /* 切换天线(若指定了合法天线号), 等待稳定后再执行命令 */
     if (ant >= 1U && ant <= RFID_ANT_COUNT) {
         RFID_SetAntenna((uint8_t)ant);
         RFID_EcatDelayMs(RFID_ANT_SETTLE_MS);
@@ -782,7 +795,11 @@ uint8_t RFID_EcatCmdTask(void)
         break;
     }
 
-    /* ---- 结果写 TxPDO ---- */
+    /* ---- 结果写 TxPDO ----
+     * 命令执行完毕, 根据 ret 更新 STATUS/RESULT:
+     *   成功: STATUS=OK, RESULT=0
+     *   失败: STATUS=ERROR, RESULT 优先用模块错误码(rfid_last_error),
+     *         没有模块错误码时用驱动错误码取反(-ret, 如 FRAME_ERR=-3 → 3) */
     if (ret == RFID_RET_OK) {
         DI(TX_RFID_CMD_STATUS) = RFID_PLC_STATUS_OK;
         DI(TX_RFID_CMD_RESULT) = 0;
@@ -790,7 +807,7 @@ uint8_t RFID_EcatCmdTask(void)
         DI(TX_RFID_CMD_STATUS) = RFID_PLC_STATUS_ERROR;
         DI(TX_RFID_CMD_RESULT) = (uint16_t)((rfid_last_error != 0U) ? rfid_last_error : (uint16_t)(-ret));
     }
-    return 1U;
+    return 1U;   /* 命令处理中, 主循环跳过 RFID_Scan */
 }
 
 /* 周期任务(每 PDO 周期一次)。递增心跳 → DI(0)，映射 3 天线数据到 TxPDO。 */
