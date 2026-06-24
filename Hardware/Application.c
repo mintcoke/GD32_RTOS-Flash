@@ -31,19 +31,19 @@
 #define RFID_PDO_EPC         3   /* EPC 数据起始 (31 个 UINT16) */
 
 #define RFID_ANT_SETTLE_MS   5U  /* 天线切换稳定时间 */
-#define RFID_CMD_DATA_WORDS  64  /* 命令响应最大字数 (128 字节, 受 TxPDO 数据区限制) */
-#define RFID_REQ_DATA_WORDS  64  /* 请求数据最大字数 (128 字节, 受 RxPDO 数据区限制) */
+#define RFID_CMD_DATA_WORDS  128 /* 命令响应最大字数 (256 字节, 受 TxPDO 数据区限制) */
+#define RFID_REQ_DATA_WORDS  128 /* 请求数据最大字数 (256 字节, 受 RxPDO 数据区限制) */
 #define RFID_CMD_DATA_BYTES  (RFID_CMD_DATA_WORDS * 2)
 #define RFID_REQ_DATA_BYTES  (RFID_REQ_DATA_WORDS * 2)
 
 /* 各存储区读写上限(字)。标准上限放行，越界写由标签返回错误码如实上报。
  * RFU: 标准固定 64 位=4 字，写禁止。
  * EPC: 标准上限 31 字(PC 5 位编码)，前两字 PC/CRC 禁写。
- * TID/USER: 标准未限定，固件按 PDO 数据区 64 字限(单次命令传输上限)。 */
+ * TID/USER: 标准未限定，固件按 PDO 数据区 128 字限(单次命令传输上限)。 */
 #define RFID_RFU_MAX_WORDS     4U
 #define RFID_EPC_MAX_WORDS     31U
-#define RFID_TID_MAX_WORDS     64U
-#define RFID_USER_MAX_WORDS    64U
+#define RFID_TID_MAX_WORDS     128U
+#define RFID_USER_MAX_WORDS    128U
 
 /* EPC 区布局: [PC(1word,addr=1)][CRC(1word)][EPC数据(addr>=2)] */
 #define RFID_EPC_PC_ADDR     1U
@@ -330,6 +330,77 @@ static void RFID_MapAntennaToPdo(uint8_t ant_idx, uint16_t pdo_base)
     }
 }
 
+/* 一键读三通道 EPC+USER。
+ * 每通道: [EPC状态][EPC N字][USER状态][USER WORDS字] 依次写入 TxPDO 响应区。
+ * EPC 长度 N 取自标签 PC 字高 5 位(自动适配); USER 读 ADDR 起 WORDS 字。
+ * 失败通道状态写错误码、数据填 0，继续下一通道。总长超 128 字截断。
+ * USER 区读前用各通道缓存 EPC 选标签(无缓存先 Inventory)。 */
+static int RFID_ReadEpcUserAll(uint16_t user_addr, uint16_t user_words, uint8_t *buf)
+{
+    uint16_t out_word = 0;   /* TxPDO 响应区当前写入字偏移(相对 TX_RFID_CMD_DATA) */
+    uint16_t user_bytes = (uint16_t)(user_words * 2U);
+
+    for (uint8_t ant = 1U; ant <= RFID_ANT_COUNT; ant++) {
+        uint16_t epc_words = 0;
+        uint8_t epc_status = 0;
+        uint8_t user_status = 0;
+        uint8_t epc_buf[RFID_EPC_BYTES + 2];
+
+        RFID_SetAntenna(ant);
+        RFID_EcatDelayMs(RFID_ANT_SETTLE_MS);
+
+        /* --- 读 EPC: 先读 PC 字取长度, 再读 EPC 数据 --- */
+        if (RFID_ReadTag(RFID_BANK_EPC, RFID_EPC_PC_ADDR, 1U, epc_buf) == RFID_RET_OK) {
+            uint16_t pc = RFID_ReadU16BE(epc_buf);
+            epc_words = (uint16_t)((pc >> 11) & 0x1FU);
+            if (epc_words > 0U && epc_words <= RFID_EPC_MAX_WORDS) {
+                if (RFID_ReadTag(RFID_BANK_EPC, RFID_EPC_DATA_ADDR, epc_words, epc_buf) != RFID_RET_OK) {
+                    epc_status = (rfid_last_error != 0U) ? rfid_last_error : 0xFFU;
+                    epc_words = 0;
+                }
+            }
+        } else {
+            epc_status = (rfid_last_error != 0U) ? rfid_last_error : 0xFFU;
+        }
+
+        /* --- 读 USER: 先选标签(用缓存 EPC), 再读 --- */
+        if (RFID_PlcEnsureSelected(ant, buf) == RFID_RET_OK) {
+            if (RFID_ReadTag(RFID_BANK_USER, user_addr, user_words, buf) != RFID_RET_OK) {
+                user_status = (rfid_last_error != 0U) ? rfid_last_error : 0xFFU;
+            }
+        } else {
+            user_status = (rfid_last_error != 0U) ? rfid_last_error : 0xFFU;
+        }
+
+        /* --- 写入 TxPDO: [EPC状态][EPC数据][USER状态][USER数据] --- */
+        /* EPC 状态字 */
+        if (out_word < RFID_CMD_DATA_WORDS) {
+            DI(TX_RFID_CMD_DATA + out_word) = epc_status;
+            out_word++;
+        }
+        /* EPC 数据(大端打包) */
+        for (uint16_t i = 0; i < epc_words && out_word < RFID_CMD_DATA_WORDS; i++) {
+            DI(TX_RFID_CMD_DATA + out_word) = RFID_PackBytes(epc_buf, (uint16_t)(epc_words * 2U), (uint16_t)(i * 2U));
+            out_word++;
+        }
+        /* USER 状态字 */
+        if (out_word < RFID_CMD_DATA_WORDS) {
+            DI(TX_RFID_CMD_DATA + out_word) = user_status;
+            out_word++;
+        }
+        /* USER 数据(成功才有数据, 失败填 0) */
+        for (uint16_t i = 0; i < user_words && out_word < RFID_CMD_DATA_WORDS; i++) {
+            DI(TX_RFID_CMD_DATA + out_word) = (user_status == 0U)
+                ? RFID_PackBytes(buf, user_bytes, (uint16_t)(i * 2U))
+                : 0;
+            out_word++;
+        }
+    }
+
+    DI(TX_RFID_CMD_DATA_LEN) = (uint16_t)(out_word * 2U);
+    return RFID_RET_OK;
+}
+
 /* PLC 命令分发核心。从 RxPDO 读命令执行，结果写 TxPDO。
  * 返回 1=处理中(主循环跳过 RFID_Scan), 0=无命令(继续 Scan)。
  * 边沿触发见文件头说明。 */
@@ -425,6 +496,14 @@ uint8_t RFID_EcatCmdTask(void)
             if (ret == RFID_RET_OK) {
                 RFID_WriteCmdDataToPdo(buf, (uint16_t)(words * 2U));
             }
+        }
+        break;
+
+    case RFID_PLC_CMD_READ_EPC_USER_ALL:  /* 一键读三通道 EPC+USER */
+        if (words == 0U || words > 32U) {
+            ret = RFID_RET_FRAME_ERR;   /* USER 字数 1~32, 保证三通道≤128 字 */
+        } else {
+            ret = RFID_ReadEpcUserAll(addr, words, buf);
         }
         break;
 

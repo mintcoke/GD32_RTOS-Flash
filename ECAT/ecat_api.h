@@ -7,8 +7,8 @@
  *
  * PDO 布局 (各 510 个 UINT16 = 1020 字节):
  *   TxPDO: DI(0)=心跳, DI(1..34/35..68/69..102)=天线1/2/3(RSSI,EPC_LEN,NEW,EPC×31字),
- *          DI(103..106)=命令响应头(ECHO,STATUS,RESULT,LEN), DI(107..170)=响应数据(64字)
- *   RxPDO: DO(0)=命令码, DO(1)=天线, DO(2)=地址/参数, DO(3)=字数/参数, DO(4..67)=写入数据(64字)
+ *          DI(103..106)=命令响应头(ECHO,STATUS,RESULT,LEN), DI(107..234)=响应数据(128字)
+ *   RxPDO: DO(0)=命令码, DO(1)=天线, DO(2)=地址/参数, DO(3)=字数/参数, DO(4..131)=写入数据(128字)
  */
 #ifndef _ECAT_API_H_
 #define _ECAT_API_H_
@@ -63,7 +63,7 @@ extern "C" {
 #define TX_RFID_CMD_STATUS   104 /* 0=空闲 1=执行中 2=成功 3=错误 */
 #define TX_RFID_CMD_RESULT   105 /* 0=成功, 非零=错误码 */
 #define TX_RFID_CMD_DATA_LEN 106 /* 响应数据长度(字节) */
-#define TX_RFID_CMD_DATA     107 /* 响应数据, 64 字 = 128 字节 */
+#define TX_RFID_CMD_DATA     107 /* 响应数据, 128 字 = 256 字节 */
 
 /* ---- RxPDO (DO) 布局 — 主站→从站 ---- */
 
@@ -71,7 +71,7 @@ extern "C" {
 #define RX_RFID_ANT      1   /* 天线: 1/2/3, 0=保持当前 */
 #define RX_RFID_ADDR     2   /* 起始字地址(仅读写类命令用) */
 #define RX_RFID_WORDS    3   /* 读写字数(读写类) 或 参数值(参数类命令) */
-#define RX_RFID_DATA     4   /* 写入数据, 64 字 = 128 字节 */
+#define RX_RFID_DATA     4   /* 写入数据, 128 字 = 256 字节 */
 
 /* ---- PLC 命令码 — 写 DO(0) 触发，边沿触发(见 Application.c 文件头) ---- */
 
@@ -107,6 +107,7 @@ extern "C" {
 #define RFID_PLC_CMD_SELECT_EPC     30  /* WORDS=EPC字数, DATA=EPC码 */
 #define RFID_PLC_CMD_CLEAR_SELECT   31
 #define RFID_PLC_CMD_READ_RFU       32  /* ADDR+WORDS(最多4字), 写禁止 */
+#define RFID_PLC_CMD_READ_EPC_USER_ALL 33  /* 一键读三通道 EPC+USER: ADDR=USER起始, WORDS=USER字数(≤32) */
 #define RFID_PLC_CMD_RAW            100 /* ADDR=模块命令码, WORDS=数据字节数, DATA=数据 */
 
 /* 命令状态码 — DI(TX_RFID_CMD_STATUS) */

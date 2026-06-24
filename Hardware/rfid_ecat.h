@@ -106,7 +106,7 @@
 #define RFID_RX_BUF_SIZE      256
 #define RFID_TX_BUF_SIZE      256
 #define RFID_EPC_MAX_LEN      62
-#define RFID_TAG_MAX_WORDS    64U   /* 单次读写最大字数 (受 PDO 数据区限制, 64字=128字节) */
+#define RFID_TAG_MAX_WORDS    128U   /* 单次读写最大字数 (受 PDO 数据区限制, 128字=256字节) */
 
 /* ---- 标签信息 (Inventory 返回) ---- */
 typedef struct {
