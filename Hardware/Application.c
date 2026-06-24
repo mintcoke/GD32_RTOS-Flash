@@ -502,7 +502,7 @@ uint8_t RFID_EcatCmdTask(void)
                     RFID_WriteCmdDataToPdo(buf, (uint16_t)(words * 2U));
                 }
             }
-        }READ_EPC_USER_ALL
+        }
         break;
 
     case RFID_PLC_CMD_READ_RFU:     /* 读 RFU 区(密码)，最多 4 字，写禁止 */
